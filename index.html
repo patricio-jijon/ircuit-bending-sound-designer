@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
+  <title>Circuit Bending Sound Designer</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to sound workspace</a>
+
+  <header class="app-header">
+    <a class="brand" href="#studio" aria-label="Circuit Bending Sound Designer home">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span><strong>Circuit Bending</strong><small>Sound Designer</small></span>
+    </a>
+    <nav class="tabs" aria-label="Application views">
+      <button class="tab is-active" type="button" data-view="studio">Studio</button>
+      <button class="tab" type="button" data-view="learn">Learn</button>
+      <button class="tab" type="button" data-view="build">Build &amp; budget</button>
+      <button class="tab" type="button" data-view="experiment">Experiment</button>
+    </nav>
+    <button id="audio-toggle" class="audio-toggle" type="button" aria-pressed="false">
+      <span class="power-icon" aria-hidden="true"></span>
+      <span>Start audio</span>
+    </button>
+  </header>
+
+  <main id="main">
+    <section id="studio" class="view is-active" aria-labelledby="studio-heading">
+      <h1 id="studio-heading" class="sr-only">Sound design studio</h1>
+      <div class="studio-layout">
+        <aside class="library" aria-labelledby="library-title">
+          <div class="panel-heading">
+            <div><span class="section-number">01</span><h2 id="library-title">Modules</h2></div>
+            <p>Add any module more than once.</p>
+          </div>
+          <div id="module-library" class="module-library"></div>
+        </aside>
+
+        <div class="workspace">
+          <section class="source-strip" aria-labelledby="source-title">
+            <div>
+              <span class="section-number">02</span>
+              <h2 id="source-title">Sound source</h2>
+            </div>
+            <div class="source-controls">
+              <label for="source-select">Input</label>
+              <select id="source-select">
+                <option value="demo">Built-in riff</option>
+                <option value="tone">Test oscillator</option>
+                <option value="microphone">Microphone / guitar interface</option>
+                <option value="file">Audio file</option>
+              </select>
+              <label id="file-label" class="file-button" for="audio-file" hidden>Choose audio file</label>
+              <input id="audio-file" type="file" accept="audio/*" hidden>
+              <label class="volume-field" for="master-volume">Output <output id="master-volume-value">70%</output></label>
+              <input id="master-volume" type="range" min="0" max="100" value="70">
+            </div>
+          </section>
+
+          <section class="signal-workbench" aria-labelledby="chain-title">
+            <div class="workbench-header">
+              <div>
+                <span class="section-number">03</span>
+                <h2 id="chain-title">Signal chain</h2>
+              </div>
+              <div class="chain-actions">
+                <button id="preset-grit" class="text-button" type="button">Load grit preset</button>
+                <button id="clear-chain" class="icon-button" type="button" title="Clear signal chain" aria-label="Clear signal chain">×</button>
+              </div>
+            </div>
+            <p id="chain-help" class="muted">Audio travels from left to right. Select a module to change its virtual components.</p>
+            <div id="signal-chain" class="signal-chain" aria-describedby="chain-help"></div>
+
+            <div class="scope-grid">
+              <div class="scope-block">
+                <div class="scope-label"><span>Oscilloscope</span><small>Simulated audio output</small></div>
+                <canvas id="waveform" width="900" height="220" aria-label="Animated output waveform"></canvas>
+              </div>
+              <div class="scope-block spectrum-block">
+                <div class="scope-label"><span>Spectrum</span><small>Frequency energy</small></div>
+                <canvas id="spectrum" width="420" height="220" aria-label="Animated output frequency spectrum"></canvas>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="inspector" aria-labelledby="inspector-title">
+          <div class="panel-heading">
+            <div><span class="section-number">04</span><h2 id="inspector-title">Component bench</h2></div>
+            <p id="inspector-subtitle">Select a module in the chain.</p>
+          </div>
+          <div id="inspector-content" class="inspector-content">
+            <div class="empty-inspector">
+              <div class="empty-symbol" aria-hidden="true">R?</div>
+              <p>Add a module, then select it to explore the components behind its sound.</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="learn" class="view content-view" aria-labelledby="learn-title" hidden>
+      <div class="content-intro">
+        <span class="section-number">Learn</span>
+        <h1 id="learn-title">Hear the circuit relationship</h1>
+        <p>A component does not have one universal sound. Its position in a circuit determines whether it changes gain, pitch, tone, clipping, or time.</p>
+      </div>
+      <div id="lesson-list" class="lesson-list"></div>
+      <section class="definitions" aria-labelledby="vocabulary-title">
+        <h2 id="vocabulary-title">Core vocabulary</h2>
+        <dl>
+          <div><dt>Resistance</dt><dd>Opposition to current, measured in ohms (Ω). With a capacitor, it can also set timing or filtering.</dd></div>
+          <div><dt>Capacitance</dt><dd>Stored electric charge, measured in farads (F). It shapes how quickly voltage can change.</dd></div>
+          <div><dt>Clipping</dt><dd>Flattening a waveform when a circuit cannot reproduce its full amplitude, producing harmonics and distortion.</dd></div>
+          <div><dt>Feedback</dt><dd>Sending part of an output back to an input. It can create echoes, sustain, instability, or oscillation.</dd></div>
+        </dl>
+        <p class="fine-print">Reference: <a href="https://www.ti.com/lit/ds/symlink/ne555.pdf" target="_blank" rel="noopener noreferrer">Texas Instruments NE555 datasheet</a>. The audio modules are educational behavioral models, not complete construction schematics.</p>
+      </section>
+    </section>
+
+    <section id="build" class="view content-view" aria-labelledby="build-title" hidden>
+      <div class="content-intro compact-intro">
+        <span class="section-number">Build</span>
+        <h1 id="build-title">Budget the current chain</h1>
+        <p>Estimated classroom quantities and prices for one prototype in New York City. Taxes, shipping, tools, and minimum package sizes are not included.</p>
+      </div>
+      <div class="build-layout">
+        <section class="bom-section" aria-labelledby="bom-title">
+          <div class="build-heading">
+            <div><h2 id="bom-title">Bill of materials</h2><p class="evidence-label">Editable estimate · USD</p></div>
+            <div class="budget-total"><span>Estimated total</span><strong id="budget-total">$0.00</strong></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Component</th><th scope="col">Qty</th><th scope="col">Unit cost</th><th scope="col">Subtotal</th><th scope="col">Purchase search</th></tr></thead>
+              <tbody id="bom-body"></tbody>
+            </table>
+          </div>
+          <p class="fine-print">Amazon buttons open US search results, not endorsed listings. Verify the exact value, package, voltage rating, polarity, pinout, and seller before purchase. Prices are user-editable estimates and are not live Amazon prices. This concept BOM is for budgeting only; use a verified schematic before physical assembly.</p>
+          <div class="export-row">
+            <button id="download-bom" type="button">Download BOM as CSV</button>
+            <button id="print-build" class="secondary-button" type="button">Print build sheet</button>
+          </div>
+        </section>
+
+        <section class="model-section" aria-labelledby="model-title">
+          <div class="build-heading"><div><h2 id="model-title">Enclosure model</h2><p class="evidence-label">Generic layout STL</p></div></div>
+          <div class="enclosure-preview" aria-hidden="true">
+            <div class="enclosure-box"><span></span><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="dimension-grid">
+            <label for="case-width">Width (mm)<input id="case-width" type="number" min="60" max="300" value="120"></label>
+            <label for="case-depth">Depth (mm)<input id="case-depth" type="number" min="50" max="240" value="95"></label>
+            <label for="case-height">Height (mm)<input id="case-height" type="number" min="20" max="100" value="35"></label>
+            <label for="case-wall">Wall (mm)<input id="case-wall" type="number" min="1.5" max="6" step="0.5" value="2.5"></label>
+          </div>
+          <button id="download-stl" type="button">Download enclosure STL</button>
+          <p id="stl-note" class="fine-print">This open-top reference shell is generated from your dimensions. It has no component cutouts and is not guaranteed to fit real hardware. Verify every part with its manufacturer drawing before fabrication.</p>
+        </section>
+      </div>
+    </section>
+
+    <section id="experiment" class="view content-view" aria-labelledby="experiment-title" hidden>
+      <div class="content-intro compact-intro">
+        <span class="section-number">Experiment</span>
+        <h1 id="experiment-title">Predict, change, observe</h1>
+        <p>Use the studio to test one variable at a time. Browser sound is simulated; anything you measure on a physical circuit must be recorded separately.</p>
+      </div>
+      <div class="experiment-layout">
+        <form id="experiment-form" class="experiment-form">
+          <fieldset>
+            <legend>1. Make a prediction</legend>
+            <label for="experiment-module">Module to investigate</label>
+            <select id="experiment-module"><option>Oscillator / Dual 555</option><option>Fuzz</option><option>Overdrive</option><option>Distortion</option><option>Octave</option><option>Delay</option><option>Glitch</option></select>
+            <label for="prediction">What will happen when you increase one resistor or capacitor?</label>
+            <textarea id="prediction" rows="3" required></textarea>
+          </fieldset>
+          <fieldset>
+            <legend>2. Change and observe</legend>
+            <label for="changed-value">Component and values used</label>
+            <input id="changed-value" type="text" placeholder="Example: R2 from 10 kΩ to 22 kΩ" required>
+            <label for="observation">What did you hear or see?</label>
+            <textarea id="observation" rows="3" required></textarea>
+          </fieldset>
+          <fieldset>
+            <legend>3. Explain</legend>
+            <label for="reflection">Was your prediction supported? Use resistance, capacitance, clipping, or feedback in your explanation.</label>
+            <textarea id="reflection" rows="4" required></textarea>
+          </fieldset>
+          <button type="submit">Save experiment summary</button>
+          <button id="reset-experiment" class="secondary-button" type="reset">Reset</button>
+        </form>
+        <aside class="challenge" aria-labelledby="challenge-title">
+          <p class="evidence-label">Design challenge</p>
+          <h2 id="challenge-title">From clean pulse to broken machine</h2>
+          <ol>
+            <li>Add an oscillator and set a steady pitch.</li>
+            <li>Add fuzz twice. Give each stage a different clipping material.</li>
+            <li>Place octave before distortion, listen, then reverse their order.</li>
+            <li>Add delay and increase feedback until repeats nearly sustain.</li>
+            <li>Explain why changing the order changed the result.</li>
+          </ol>
+          <div class="safety-note"><strong>Physical build safety</strong><p>Use only 3.3–12 V DC. Disconnect power before rewiring, check polarized parts, and use a current-limited supply when practical.</p></div>
+        </aside>
+      </div>
+      <output id="experiment-output" class="experiment-output" aria-live="polite"></output>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

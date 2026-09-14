@@ -1,0 +1,10 @@
+{
+  "name": "circuit-bending-sound-designer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive educational sound-effects and component laboratory",
+  "scripts": {
+    "test": "node tests/smoke-test.mjs",
+    "start": "python -m http.server 8000"
+  }
+}
