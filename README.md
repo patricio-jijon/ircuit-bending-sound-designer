@@ -35,6 +35,7 @@ GitHub will provide the public URL after deployment completes.
 - Hardware Lab with synchronized schematics, named breadboard holes, canonical connection tables, power-off assembly steps, component illustrations, and preset-specific Amazon searches
 - Circuit Builder opens first and keeps the selected preset connected to the browser sound model
 - Tinkercad-inspired physical workspace with a searchable parts library, single breadboard/schematic canvas, contextual component inspector, zoom, and undo/redo
+- Device Planner with seven exact controller boards, twenty-five supported chips/devices, mixed-device selection, compatibility blockers, and suggested connection plans
 - Resistor, capacitor, potentiometer, diode-material, and transistor-model exploration controls
 - STEM Center inventory status for stocked, unverified, and additional-purchase parts, with separate purchase estimate
 - Breadboard, schematic, connections, pinouts, and assembly are focused workspace views rather than one long document
@@ -71,6 +72,7 @@ Keep physical experiments between 3.3 V and 12 V DC. Disconnect power before cha
 - `styles.css` — responsive visual system
 - `app.js` — module definitions, audio graph, calculations, budget, and exports
 - `hardware-data.js` — exact hardware preset inventories, connections, placements, assembly steps, and sources
+- `devices-data.js` — supported controller, IC, sensor, actuator, display, and interface catalog with compatibility metadata
 
 No dependencies or build step are required.
 
