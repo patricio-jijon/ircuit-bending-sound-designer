@@ -19,6 +19,9 @@ assert.match(html, /id="signal-chain"/);
 assert.match(html, /id="bom-body"/);
 assert.match(html, /id="download-stl"/);
 assert.match(html, /id="hardware-preset"/);
+assert.match(html, /id="hardware-audio-toggle"/);
+assert.match(html, /id="hardware-source-select"/);
+assert.match(html, /id="hardware" class="view hardware-view is-active"/);
 assert.match(html, /id="construction-panel"/);
 assert.match(html, /aria-live="polite"/);
 
@@ -35,6 +38,13 @@ assert.match(js, /amazon\.com\/s\?k=/);
 assert.match(js, /solid circuit_bending_enclosure/);
 assert.match(js, /function breadboardSvg/);
 assert.match(js, /function schematicSvg/);
+assert.match(js, /function syncAudioButtons/);
+assert.match(js, /function inventoryMatch/);
+assert.match(js, /Transistor model/);
+for (const section of ["schematic", "breadboard", "connections", "pinouts", "assembly"]) {
+  assert.match(js, new RegExp(`id="construction-${section}"`), `Missing visible ${section} section`);
+}
+assert.match(js, /loadHardwareSound\(\);[\s\S]*const initialView/);
 for (const preset of ["dual555", "opampFuzz", "glitchClock"]) {
   assert.match(hardware, new RegExp(`\\b${preset}: \\{`), `Missing ${preset} hardware preset`);
 }

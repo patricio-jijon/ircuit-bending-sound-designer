@@ -20,7 +20,11 @@ for (const [key, preset] of Object.entries(window.HARDWARE_PRESETS)) {
   assert(preset.assembly.length >= 8);
   assert(preset.sources.every(([, url]) => url.startsWith("https://")));
   for (const control of preset.controls) {
-    assert(Number.isFinite(preset.values[control.key]), `${key}: missing ${control.key}`);
+    if (control.type === "select") {
+      assert(control.options.some((option) => option.value === preset.values[control.key]), `${key}: invalid ${control.key} selection`);
+    } else {
+      assert(Number.isFinite(preset.values[control.key]), `${key}: missing ${control.key}`);
+    }
     assert(preset.chain[control.audio.module], `${key}: audio module index missing`);
   }
   for (const row of preset.connections) {

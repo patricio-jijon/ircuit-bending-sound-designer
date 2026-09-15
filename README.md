@@ -33,6 +33,10 @@ GitHub will provide the public URL after deployment completes.
 - Quantity-aware concept BOM, editable USD estimates, Amazon US search links, and CSV export
 - Dimension-based generic open-top enclosure STL export
 - Hardware Lab with synchronized schematics, named breadboard holes, canonical connection tables, power-off assembly steps, component illustrations, and preset-specific Amazon searches
+- Circuit Builder opens first and keeps the selected preset connected to the browser sound model
+- Resistor, capacitor, potentiometer, diode-material, and transistor-model exploration controls
+- STEM Center inventory status for stocked, unverified, and additional-purchase parts, with separate purchase estimate
+- All construction sections remain visible together: schematic, breadboard, connections, pinouts, and assembly
 - Three physical-build presets: Dual 555 Drone, TL072 Diode Fuzz, and 40106 Glitch Clock
 - Guided prediction, observation, and reflection activity
 - Keyboard focus, semantic controls, responsive layouts, and reduced-motion support
@@ -43,7 +47,7 @@ The sound is a real-time **digital behavioral simulation**. Formulas shown as ca
 
 The bill of materials is a concept budget, not a construction-ready circuit. Amazon prices are not fetched automatically and can change. Verify part values, package, voltage and power ratings, pinouts, polarity, availability, and seller before buying or building.
 
-The **Hardware Lab** is more specific than the freeform sound studio. Its three physical presets use named through-hole IC variants and manufacturer pinout sources. They are calculated and diagram-audited but have not been physically assembled or measured. Freeform octave, delay, and combined DSP chains remain simulation-only until separate hardware designs are validated.
+The **Circuit Builder** is more specific than the freeform sound studio. Its three physical presets use named through-hole IC variants and manufacturer pinout sources. They are calculated and diagram-audited but have not been physically assembled or measured. Freeform octave, delay, transistor substitutions, and combined DSP chains remain simulation-only until separate hardware designs are validated.
 
 The downloaded STL is a generic reference shell made from the entered dimensions. It has no connector or control cutouts. Measure exact physical components and verify manufacturer mechanical drawings before fabrication.
 

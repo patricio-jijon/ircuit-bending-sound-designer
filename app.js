@@ -41,11 +41,12 @@ const MODULES = {
       { key: "rin", label: "Input resistor Rin", unit: "kΩ", min: 1, max: 100, step: 1, value: 10, role: "Works with the feedback resistor to set modeled gain." },
       { key: "rf", label: "Feedback resistor Rf", unit: "kΩ", min: 10, max: 1000, step: 10, value: 470, role: "More feedback resistance increases gain and clipping." },
       { key: "toneC", label: "Tone capacitor", unit: "nF", min: 1, max: 220, step: 1, value: 22, role: "With the load resistance, it rolls off high frequencies." },
-      { key: "diode", label: "Clipping material", type: "select", value: "germanium", options: [{ value: "germanium", label: "Germanium · soft / early" }, { value: "silicon", label: "Silicon · tighter" }, { value: "led", label: "LED · loud / open" }], role: "Different forward-voltage models change when clipping begins." },
+      { key: "diode", label: "Clipping material", type: "select", value: "germanium", options: [{ value: "germanium", label: "1N34A germanium · soft / early" }, { value: "schottky", label: "1N5817 Schottky · STEM stock" }, { value: "silicon", label: "1N4148 silicon · tighter" }, { value: "led", label: "3 mm LED · loud / open" }], role: "Different forward-voltage models change when clipping begins." },
+      { key: "transistor", label: "Transistor model", type: "select", value: "2n3904", options: [{ value: "2n3904", label: "onsemi 2N3904 · general purpose" }, { value: "2n5088", label: "onsemi 2N5088 · higher gain" }], role: "The browser model changes gain character. Both selections require verified TO-92 E-B-C orientation before a physical swap." },
       { key: "level", label: "Output level", unit: "%", min: 5, max: 100, step: 1, value: 58, role: "Attenuates the processed output after clipping." }
     ],
     bom: [
-      ["2N3904 NPN transistor", 2, 0.22, "2N3904 transistor TO-92"],
+      ["NPN transistor pair (2N3904 or 2N5088)", 2, 0.22, "2N3904 2N5088 transistor TO-92"],
       ["Germanium diode 1N34A", 2, 0.85, "1N34A germanium diode"],
       ["Resistor assortment, 1/4 W", 5, 0.08, "quarter watt resistor assortment"],
       ["Film capacitor assortment", 3, 0.22, "film capacitor assortment audio"],
@@ -259,8 +260,8 @@ function calculateModule(instance) {
       title: "Gain and tone estimate",
       formula: "Gain ≈ 1 + Rf ÷ Rin;  fc = 1 ÷ (2πRC)",
       substitution: `1 + ${p.rf} kΩ ÷ ${p.rin} kΩ; R = 10 kΩ, C = ${p.toneC} nF`,
-      result: `${gain.toFixed(1)}× gain · ${cutoff.toFixed(0)} Hz tone corner`,
-      why: "More gain drives the virtual clipper harder. Increasing the tone capacitor lowers the filter corner, removing more high-frequency edge."
+      result: `${gain.toFixed(1)}× gain · ${cutoff.toFixed(0)} Hz tone corner · ${p.transistor === "2n5088" ? "2N5088" : "2N3904"} model`,
+      why: "More gain drives the virtual clipper harder. Increasing the tone capacitor lowers the filter corner. The transistor selection changes the behavioral gain character; physical gain varies from part to part, so verify the exact package and pin order."
     };
   }
   if (instance.type === "overdrive") {
@@ -569,7 +570,7 @@ function makeCurve(amount, threshold = 0.7, mode = "distortion") {
 }
 
 function diodeThreshold(material) {
-  return material === "germanium" ? 0.3 : material === "led" ? 1.8 : 0.7;
+  return material === "germanium" ? 0.3 : material === "schottky" ? 0.25 : material === "led" ? 1.8 : 0.7;
 }
 
 function createModuleProcessor(instance) {
@@ -600,7 +601,8 @@ function createModuleProcessor(instance) {
     const shaper = ctx.createWaveShaper();
     const filter = ctx.createBiquadFilter();
     const threshold = diodeThreshold(p.diode);
-    const drive = instance.type === "fuzz" ? clamp((1 + p.rf / p.rin) * 2.1, 1, 100) : instance.type === "overdrive" ? clamp((1 + p.drive / p.rin) * 1.35, 1, 75) : clamp((1 + p.drive / 4.7) * 2.8, 1, 100);
+    const transistorFactor = p.transistor === "2n5088" ? 1.22 : 1;
+    const drive = instance.type === "fuzz" ? clamp((1 + p.rf / p.rin) * 2.1 * transistorFactor, 1, 100) : instance.type === "overdrive" ? clamp((1 + p.drive / p.rin) * 1.35, 1, 75) : clamp((1 + p.drive / 4.7) * 2.8, 1, 100);
     shaper.curve = makeCurve(drive, threshold);
     shaper.oversample = "4x";
     filter.type = instance.type === "overdrive" ? "highpass" : "lowpass";
@@ -695,25 +697,19 @@ function rebuildAudioGraph() {
 }
 
 async function toggleAudio() {
-  const button = $("#audio-toggle");
   try {
     await ensureAudio();
     state.audioOn = !state.audioOn;
     if (state.audioOn) {
       rebuildAudioGraph();
       await startSource();
-      button.classList.add("is-on");
-      button.setAttribute("aria-pressed", "true");
-      button.querySelector("span:last-child").textContent = "Stop audio";
       announce("Audio started. Output is a browser simulation.");
     } else {
       stopSource();
       await audio.context.suspend();
-      button.classList.remove("is-on");
-      button.setAttribute("aria-pressed", "false");
-      button.querySelector("span:last-child").textContent = "Start audio";
       announce("Audio stopped.");
     }
+    syncAudioButtons();
   } catch (error) {
     announce(error.message || "Audio could not start in this browser.");
   }
@@ -847,8 +843,27 @@ function hardwarePreset() {
 }
 
 function componentValue(component, preset) {
-  if (component.valueKey) return `${preset.values[component.valueKey]}${component.suffix || ""}`;
+  if (component.valueKey) {
+    const control = preset.controls.find((item) => item.key === component.valueKey);
+    const selected = control?.options?.find((option) => option.value === preset.values[component.valueKey]);
+    return `${selected?.label || preset.values[component.valueKey]}${component.suffix || ""}`;
+  }
   return component.value;
+}
+
+function inventoryMatch(component, preset) {
+  const value = String(componentValue(component, preset));
+  if (component.kind === "breadboard") return { className: "check-stock", label: "STEM list: 1 · quantity unverified", missing: false };
+  if (component.kind === "electrolytic" && /^1\s*µF/.test(value)) return { className: "in-stock", label: "STEM stock: 20 · use stocked 50 V part", missing: false };
+  if (component.kind === "electrolytic" && /^10\s*µF/.test(value)) return { className: "in-stock", label: "STEM stock: 40 at 25 V", missing: false };
+  if (component.kind === "resistor" && /^1\s*kΩ/.test(value)) return { className: "in-stock", label: "STEM stock: 100 · 1 kΩ 1/4 W", missing: false };
+  if (component.kind === "resistor" && /^4\.7\s*kΩ/.test(value)) return { className: "check-stock", label: "STEM list: 25 · rating unverified", missing: false };
+  if (component.kind === "resistor" && /^47\s*kΩ/.test(value)) return { className: "check-stock", label: "STEM list: quantity unverified", missing: false };
+  if (component.kind === "resistor") return { className: "check-stock", label: "STEM resistor assortment · verify value and quantity", missing: false };
+  if (component.kind === "diode" && preset.values.diode === "schottky") return { className: "in-stock", label: "STEM stock: 30 · 1N5817", missing: false };
+  if (component.kind === "diode") return { className: "add-part", label: "Add to STEM kit", missing: true };
+  if (component.kind === "capacitor") return { className: "add-part", label: "Add film/ceramic value to kit", missing: true };
+  return { className: "add-part", label: "Add to STEM kit", missing: true };
 }
 
 function componentIcon(kind) {
@@ -875,10 +890,22 @@ function renderHardwareControls() {
   const preset = hardwarePreset();
   $("#hardware-controls").innerHTML = `<p class="hardware-summary">${preset.summary}</p>${preset.controls.map((control) => `
     <div class="hardware-control">
-      <div><label for="hardware-${control.key}"><span>${control.ref}</span>${control.label}</label><output id="hardware-value-${control.key}">${preset.values[control.key]} ${control.unit}</output></div>
-      <input id="hardware-${control.key}" type="range" min="${control.min}" max="${control.max}" step="${control.step}" value="${preset.values[control.key]}" data-hardware-key="${control.key}">
+      <div><label for="hardware-${control.key}"><span>${control.ref}</span>${control.label}</label><output id="hardware-value-${control.key}">${control.options?.find((option) => option.value === preset.values[control.key])?.label || `${preset.values[control.key]} ${control.unit || ""}`}</output></div>
+      ${control.type === "select" ? `<select id="hardware-${control.key}" data-hardware-key="${control.key}">${control.options.map((option) => `<option value="${option.value}"${option.value === preset.values[control.key] ? " selected" : ""}>${option.label}</option>`).join("")}</select>` : `<input id="hardware-${control.key}" type="range" min="${control.min}" max="${control.max}" step="${control.step}" value="${preset.values[control.key]}" data-hardware-key="${control.key}">`}
     </div>`).join("")}
     <div class="hardware-calculation">${hardwareCalculation(preset)}</div>`;
+}
+
+function syncAudioButtons() {
+  const headerButton = $("#audio-toggle");
+  const hardwareButton = $("#hardware-audio-toggle");
+  headerButton.classList.toggle("is-on", state.audioOn);
+  headerButton.setAttribute("aria-pressed", String(state.audioOn));
+  headerButton.querySelector("span:last-child").textContent = state.audioOn ? "Stop audio" : "Start audio";
+  hardwareButton.classList.toggle("is-on", state.audioOn);
+  hardwareButton.setAttribute("aria-pressed", String(state.audioOn));
+  hardwareButton.textContent = state.audioOn ? "Stop sound" : "Start sound";
+  $("#hardware-audio-status").textContent = state.audioOn ? "Sound is playing · move a component control and listen" : "Sound model connected · press Start sound";
 }
 
 function hardwareCalculation(preset) {
@@ -890,7 +917,8 @@ function hardwareCalculation(preset) {
   if (preset.id === "opampFuzz") {
     const gain = v.rf / v.rin;
     const fc = 1 / (2 * Math.PI * 10000 * v.toneC * 1e-9);
-    return `<span>Calculated relationships</span><strong>${gain.toFixed(1)}× gain · ${fc.toFixed(0)} Hz corner</strong><code>|A| ≈ ${v.rf} kΩ / ${v.rin} kΩ; fc = 1/(2π×10 kΩ×${v.toneC} nF)</code><p>Diodes limit the unclipped gain in practice.</p>`;
+    const clip = v.diode === "germanium" ? "about 0.3 V" : v.diode === "led" ? "about 1.8 V" : "about 0.7 V";
+    return `<span>Calculated relationships</span><strong>${gain.toFixed(1)}× gain · ${fc.toFixed(0)} Hz corner</strong><code>|A| ≈ ${v.rf} kΩ / ${v.rin} kΩ; fc = 1/(2π×10 kΩ×${v.toneC} nF)</code><p>${v.diode} clipping model: ${clip}. Replace D1 and D2 together.</p>`;
   }
   const rate = 1 / (2.2 * v.clockR * 1000 * v.clockC * 1e-6);
   return `<span>Calculated RC estimate</span><strong>${rate.toFixed(1)} Hz</strong><code>f ≈ 1 / (2.2 × ${v.clockR} kΩ × ${v.clockC} µF)</code><p>CD40106 thresholds and part tolerances shift the physical rate.</p>`;
@@ -899,14 +927,18 @@ function hardwareCalculation(preset) {
 function renderIllustratedBom() {
   const preset = hardwarePreset();
   let total = 0;
+  let missingTotal = 0;
   $("#illustrated-components").innerHTML = preset.components.map((component) => {
     total += component.qty * component.cost;
+    const stock = inventoryMatch(component, preset);
+    if (stock.missing) missingTotal += component.qty * component.cost;
     return `<article class="part-item">
       <div class="part-icon">${componentIcon(component.kind)}</div>
-      <div><span>${component.ref} · qty ${component.qty}</span><strong>${component.name}</strong><p>${componentValue(component, preset)}</p><small>${component.note}</small><a href="https://www.amazon.com/s?k=${encodeURIComponent(component.query)}" target="_blank" rel="noopener noreferrer">Find on Amazon US ↗</a></div>
+      <div><span>${component.ref} · qty ${component.qty}</span><strong>${component.name}</strong><p>${componentValue(component, preset)}</p><small>${component.note}</small><span class="stock-badge ${stock.className}">${stock.label}</span><a href="https://www.amazon.com/s?k=${encodeURIComponent(component.query)}" target="_blank" rel="noopener noreferrer">Find on Amazon US ↗</a></div>
     </article>`;
   }).join("");
   $("#hardware-cost").textContent = `$${total.toFixed(2)}`;
+  $("#hardware-missing-cost").textContent = `$${missingTotal.toFixed(2)}`;
 }
 
 function schematicSvg(preset) {
@@ -926,7 +958,7 @@ function schematicSvg(preset) {
     <path class="wire purple" d="M120 270h160"/><path class="opamp" d="M280 225v90l95-45z"/><text x="295" y="251">+ 5</text><text x="295" y="298">− 6</text><text x="333" y="274">U1B</text><path class="wire purple" d="M375 270h75v75h-145v-48"/><text x="385" y="257">7 VREF</text>
     <path class="wire signal" d="M40 385h90"/><text x="42" y="375">INPUT</text><rect x="130" y="365" width="62" height="38" class="component-box"/><text x="161" y="389" text-anchor="middle">C2</text><path class="wire signal" d="M192 385h62"/><path class="resistor-symbol" d="M254 385l8-10 12 20 12-20 12 20 12-10h50"/><text x="260" y="420">R3 ${v.rin} kΩ</text>
     <path class="opamp" d="M360 335v100l110-50z"/><text x="376" y="365">− 2</text><text x="376" y="415">+ 3</text><text x="413" y="389">U1A</text><path class="wire purple" d="M360 410H280V270"/><path class="wire signal" d="M470 385h92"/>
-    <path class="wire orange" d="M455 355v-72H330v72"/><path class="resistor-symbol" d="M355 283l8-10 12 20 12-20 12 20 12-10"/><text x="348" y="261">R4 ${v.rf} kΩ</text><path class="wire yellow" d="M350 320h84"/><path class="diode-symbol" d="M370 310v20l22-10zm22-10v40m20-30v20l-22-10zm-22-10v40"/><text x="350" y="345">D1/D2 1N4148 antiparallel</text>
+    <path class="wire orange" d="M455 355v-72H330v72"/><path class="resistor-symbol" d="M355 283l8-10 12 20 12-20 12 20 12-10"/><text x="348" y="261">R4 ${v.rf} kΩ</text><path class="wire yellow" d="M350 320h84"/><path class="diode-symbol" d="M370 310v20l22-10zm22-10v40m20-30v20l-22-10zm-22-10v40"/><text x="350" y="345">D1/D2 ${v.diode} antiparallel</text>
     <rect x="562" y="365" width="95" height="40" class="component-box"/><text x="609" y="389" text-anchor="middle">R5 10 kΩ</text><path class="wire signal" d="M657 385h78"/><path class="wire" d="M705 385v75"/><text x="674" y="440">C4 ${v.toneC} nF</text><path class="wire signal" d="M735 385h195"/><text x="755" y="374">P1 ${v.level}% → C3 → OUTPUT</text></svg>`;
   return `${header}
     <path class="rail plus" d="M60 95H920"/><text x="65" y="86">+9 V</text><path class="rail ground" d="M60 445H920"/><text x="65" y="470">GND</text>
@@ -972,11 +1004,16 @@ function breadboardSvg(preset) {
 function renderConstruction() {
   const preset = hardwarePreset();
   const panel = $("#construction-panel");
-  if (state.constructionView === "schematic") panel.innerHTML = `<div class="graphic-heading"><div><p class="evidence-label">Construction schematic</p><h2>${preset.name}</h2></div><span>Calculated / not physically tested</span></div>${schematicSvg(preset)}<p class="graphic-caption">Reference designators and values match the parts tray. Use the Connections view as the wiring source of truth.</p>`;
-  if (state.constructionView === "breadboard") panel.innerHTML = `<div class="graphic-heading"><div><p class="evidence-label">Breadboard layout</p><h2>${preset.name}</h2></div><span>Top view · power disconnected</span></div>${breadboardSvg(preset)}<p class="graphic-caption">Colored paths show jumpers; component leads terminate at named holes. Off-board pots and jacks are defined in the Connections view.</p>`;
-  if (state.constructionView === "connections") panel.innerHTML = `<div class="graphic-heading"><div><p class="evidence-label">Canonical connection table</p><h2>${preset.name}</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${row[0]}</strong></td><td>${row.slice(1,-2).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${row.at(-1)}</td></tr>`).join("")}</tbody></table></div>`;
-  if (state.constructionView === "pinouts") panel.innerHTML = `<div class="graphic-heading"><div><p class="evidence-label">Manufacturer-verified pinouts</p><h2>${preset.name}</h2></div><span>Top view · confirm notch before power</span></div>${preset.pinouts.map((key)=>{const item=window.HARDWARE_PINOUTS[key];return `<section class="pinout-section"><h3>${item.identity}</h3><p>${item.orientation}</p><div class="connection-table-wrap"><table class="connection-table pinout-table"><thead><tr><th>Pin</th><th>Name</th><th>Role in this component</th></tr></thead><tbody>${item.pins.map(([number,name,role])=>`<tr><td>${number}</td><td><strong>${name}</strong></td><td>${role}</td></tr>`).join("")}</tbody></table></div><a href="${item.source}" target="_blank" rel="noopener noreferrer">Open manufacturer source ↗</a></section>`;}).join("")}`;
-  if (state.constructionView === "assembly") panel.innerHTML = `<div class="graphic-heading"><div><p class="evidence-label">Power-off assembly</p><h2>${preset.name}</h2></div><span>Complete one step at a time</span></div><ol class="assembly-list">${preset.assembly.map((step,index)=>`<li><span>${String(index+1).padStart(2,"0")}</span><p>${step}</p></li>`).join("")}</ol>`;
+  const pinouts = preset.pinouts.map((key) => {
+    const item = window.HARDWARE_PINOUTS[key];
+    return `<section class="pinout-section"><h3>${item.identity}</h3><p>${item.orientation}</p><div class="connection-table-wrap"><table class="connection-table pinout-table"><thead><tr><th>Pin</th><th>Name</th><th>Role in this component</th></tr></thead><tbody>${item.pins.map(([number,name,role])=>`<tr><td>${number}</td><td><strong>${name}</strong></td><td>${role}</td></tr>`).join("")}</tbody></table></div><a href="${item.source}" target="_blank" rel="noopener noreferrer">Open manufacturer source ↗</a></section>`;
+  }).join("");
+  panel.innerHTML = `
+    <section id="construction-schematic" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">1 · Construction schematic</p><h2>${preset.name}</h2></div><span>Calculated / not physically tested</span></div>${schematicSvg(preset)}<p class="graphic-caption">Reference designators and values match the parts tray and update when you move a component control.</p></section>
+    <section id="construction-breadboard" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">2 · Breadboard illustration</p><h2>Place the parts</h2></div><span>Top view · power disconnected</span></div>${breadboardSvg(preset)}<p class="graphic-caption">Colored paths show jumpers; component leads terminate at named holes. Off-board controls and jacks are listed below.</p></section>
+    <section id="construction-connections" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">3 · Wire-by-wire table</p><h2>Make every connection</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${row[0]}</strong></td><td>${row.slice(1,-2).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${row.at(-1)}</td></tr>`).join("")}</tbody></table></div></section>
+    <section id="construction-pinouts" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">4 · Manufacturer-verified pinouts</p><h2>Orient each IC</h2></div><span>Top view · confirm notch before power</span></div>${pinouts}</section>
+    <section id="construction-assembly" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">5 · Step-by-step assembly</p><h2>Build with power disconnected</h2></div><span>Complete one step at a time</span></div><ol class="assembly-list">${preset.assembly.map((step,index)=>`<li><span>${String(index+1).padStart(2,"0")}</span><p>${step}</p></li>`).join("")}</ol></section>`;
 }
 
 function renderHardwareSources() {
@@ -1000,12 +1037,11 @@ function loadHardwareSound() {
     if (module) module.params[control.audio.key] = preset.values[control.key];
   });
   if (preset.id === "dual555") state.modules[0].params.voices = "dual";
-  if (preset.id === "opampFuzz") state.modules[0].params.diode = "silicon";
   state.selectedId = state.modules[0]?.id ?? null;
   state.hardwareLoadedId = preset.id;
   renderStudio();
   rebuildAudioGraph();
-  announce(`${preset.name} sound model loaded. Open Studio to listen.`);
+  announce(`${preset.name} sound model connected. Press Start sound, then change a component.`);
 }
 
 function showView(viewId) {
@@ -1013,6 +1049,7 @@ function showView(viewId) {
   $$(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === viewId));
   if (viewId === "build") renderBom();
   if (viewId === "hardware") renderHardware();
+  if (window.location.hash !== `#${viewId}`) history.replaceState(null, "", `#${viewId}`);
   const heading = $(`#${viewId} h1`);
   if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
 }
@@ -1043,6 +1080,12 @@ function bindEvents() {
     if (event.target.matches("select[data-param]")) updateSelectedParam(event.target.dataset.param, event.target.value);
   });
   $("#audio-toggle").addEventListener("click", toggleAudio);
+  $("#hardware-audio-toggle").addEventListener("click", toggleAudio);
+  $("#hardware-source-select").addEventListener("change", async (event) => {
+    state.source = event.target.value;
+    $("#source-select").value = state.source;
+    if (state.audioOn) await startSource();
+  });
   $("#master-volume").addEventListener("input", (event) => {
     const value = Number(event.target.value);
     $("#master-volume-value").textContent = `${value}%`;
@@ -1050,6 +1093,7 @@ function bindEvents() {
   });
   $("#source-select").addEventListener("change", async (event) => {
     state.source = event.target.value;
+    if (["demo", "tone", "microphone"].includes(state.source)) $("#hardware-source-select").value = state.source;
     $("#file-label").hidden = state.source !== "file";
     if (state.audioOn) await startSource();
   });
@@ -1078,6 +1122,7 @@ function bindEvents() {
     state.hardwarePreset = event.target.value;
     state.hardwareLoadedId = null;
     renderHardware();
+    loadHardwareSound();
     announce(`${hardwarePreset().name} build guide selected.`);
   });
   $("#load-hardware-sound").addEventListener("click", loadHardwareSound);
@@ -1086,23 +1131,22 @@ function bindEvents() {
     if (!input) return;
     const preset = hardwarePreset();
     const control = preset.controls.find((item) => item.key === input.dataset.hardwareKey);
-    preset.values[control.key] = Number(input.value);
-    $(`#hardware-value-${control.key}`).textContent = `${input.value} ${control.unit}`;
+    preset.values[control.key] = control.type === "select" ? input.value : Number(input.value);
+    const selectedLabel = control.options?.find((option) => option.value === input.value)?.label;
+    $(`#hardware-value-${control.key}`).textContent = selectedLabel || `${input.value} ${control.unit || ""}`;
     if (state.hardwareLoadedId === preset.id) {
       const module = state.modules[control.audio.module];
-      if (module) module.params[control.audio.key] = Number(input.value);
+      if (module) module.params[control.audio.key] = control.type === "select" ? input.value : Number(input.value);
       rebuildAudioGraph(); renderChain(); renderInspector();
     }
     renderIllustratedBom();
     $(".hardware-calculation").innerHTML = hardwareCalculation(preset);
-    if (state.constructionView === "schematic" || state.constructionView === "breadboard") renderConstruction();
+    renderConstruction();
   });
   $(".construction-tabs").addEventListener("click", (event) => {
     const button = event.target.closest("[data-construction]");
     if (!button) return;
-    state.constructionView = button.dataset.construction;
-    $$("[data-construction]").forEach((tab) => tab.setAttribute("aria-selected", String(tab === button)));
-    renderConstruction();
+    $(`#construction-${button.dataset.construction}`).scrollIntoView({ behavior: "smooth", block: "start" });
   });
   $("#experiment-form").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1116,6 +1160,13 @@ function bindEvents() {
 
 renderLibrary();
 bindEvents();
-loadPreset();
 renderHardware();
+loadHardwareSound();
+syncAudioButtons();
+const initialView = window.location.hash.slice(1);
+showView(["studio", "learn", "build", "hardware", "experiment"].includes(initialView) ? initialView : "hardware");
+window.addEventListener("hashchange", () => {
+  const view = window.location.hash.slice(1);
+  if (["studio", "learn", "build", "hardware", "experiment"].includes(view)) showView(view);
+});
 drawScopes();

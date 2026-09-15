@@ -116,11 +116,17 @@ window.HARDWARE_PRESETS = {
     chain: ["fuzz"],
     pinouts: ["TL072CP"],
     color: "#ff795f",
-    values: { rin: 10, rf: 470, toneC: 22, level: 58 },
+    values: { rin: 10, rf: 470, toneC: 22, diode: "silicon", level: 58 },
     controls: [
       { key: "rin", ref: "R3", label: "Input resistor", unit: "kΩ", min: 1, max: 100, step: 1, audio: { module: 0, key: "rin" } },
       { key: "rf", ref: "R4", label: "Feedback resistor", unit: "kΩ", min: 10, max: 1000, step: 10, audio: { module: 0, key: "rf" } },
       { key: "toneC", ref: "C4", label: "Tone capacitor", unit: "nF", min: 1, max: 220, step: 1, audio: { module: 0, key: "toneC" } },
+      { key: "diode", ref: "D1/D2", label: "Clipping diode pair", type: "select", options: [
+        { value: "silicon", label: "1N4148 silicon · tighter" },
+        { value: "schottky", label: "1N5817 Schottky · STEM stock / softer" },
+        { value: "germanium", label: "1N34A germanium · earlier/softer" },
+        { value: "led", label: "3 mm red LED · louder/more open" }
+      ], audio: { module: 0, key: "diode" } },
       { key: "level", ref: "P1", label: "Output level", unit: "%", min: 5, max: 100, step: 1, audio: { module: 0, key: "level" } }
     ],
     components: [
@@ -129,7 +135,7 @@ window.HARDWARE_PRESETS = {
       { ref: "R1,R2", kind: "resistor", name: "Bias-divider resistor", value: "100 kΩ, 1/4 W", qty: 2, cost: 0.10, query: "100k metal film resistor quarter watt", note: "Creates about 4.5 V before buffering." },
       { ref: "R3", kind: "resistor", name: "Input resistor", valueKey: "rin", suffix: " kΩ", qty: 1, cost: 0.10, query: "metal film resistor assortment quarter watt", note: "Part of the gain ratio." },
       { ref: "R4", kind: "resistor", name: "Feedback resistor", valueKey: "rf", suffix: " kΩ", qty: 1, cost: 0.10, query: "metal film resistor assortment quarter watt", note: "Gain magnitude ≈ R4/R3 before clipping." },
-      { ref: "D1,D2", kind: "diode", name: "onsemi 1N4148 diode", value: "DO-35, antiparallel", qty: 2, cost: 0.10, query: "onsemi 1N4148 axial diode", note: "Cathode is the banded end." },
+      { ref: "D1,D2", kind: "diode", name: "Selected clipping diode pair", valueKey: "diode", qty: 2, cost: 0.10, query: "guitar pedal clipping diode assortment 1N4148 1N34A LED", note: "Replace both together. Pin polarity and forward voltage change the clipping sound." },
       { ref: "R5", kind: "resistor", name: "Tone resistor", value: "10 kΩ, 1/4 W", qty: 1, cost: 0.10, query: "10k metal film resistor quarter watt", note: "Forms low-pass filter with C4." },
       { ref: "C4", kind: "capacitor", name: "Film tone capacitor", valueKey: "toneC", suffix: " nF", qty: 1, cost: 0.25, query: "film capacitor assortment 50V", note: "Non-polarized." },
       { ref: "C1", kind: "electrolytic", name: "Bias reservoir capacitor", value: "10 µF, 25 V", qty: 1, cost: 0.20, query: "10uF 25V electrolytic capacitor", note: "Positive lead faces VBIAS." },
