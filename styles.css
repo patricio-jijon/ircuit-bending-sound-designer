@@ -598,3 +598,124 @@ td input { width: 76px; }
   th, td { color: #111; border-color: #aaa; }
   input { color: #111 !important; background: #fff !important; }
 }
+
+/* Physical computing workspace */
+.hardware-view { min-height: calc(100svh - var(--header-height)); background: #0f110e; }
+.hardware-toolbar {
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: minmax(170px, .75fr) minmax(210px, 1fr) auto minmax(310px, 1.35fr);
+  align-items: center;
+  gap: 18px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+  background: #171a16;
+}
+.hardware-title-block h1 { margin: 3px 0 0; font-size: 1.45rem; }
+.preset-field { display: grid; gap: 4px; color: var(--muted); font-size: .64rem; font-weight: 750; text-transform: uppercase; }
+.preset-field select { width: 100%; min-width: 0; }
+.workbench-tools, .simulation-tools { display: flex; align-items: center; gap: 7px; }
+.simulation-tools { justify-content: flex-end; }
+.simulation-tools select { min-width: 140px; }
+.tool-button { width: 38px; height: 38px; padding: 0; border: 1px solid #596151; background: #11130f; color: var(--ink); font-size: 1.25rem; }
+.tool-button:hover:not(:disabled), .tool-button:focus-visible { border-color: var(--focus); color: var(--focus); }
+.zoom-control { display: grid; grid-template-columns: auto 90px 42px; align-items: center; gap: 6px; margin-left: 3px; color: var(--muted); font-size: .64rem; }
+.zoom-control input { width: 90px; }
+.zoom-control output { color: var(--ink); font: 700 .66rem ui-monospace, monospace; }
+.hardware-status { min-height: 36px; padding: 7px 20px; }
+.hardware-status strong { min-width: 210px; }
+.hardware-layout {
+  display: grid;
+  grid-template-columns: 248px minmax(520px, 1fr) 310px;
+  height: calc(100svh - var(--header-height) - 118px);
+  min-height: 620px;
+  border-bottom: 1px solid var(--line);
+}
+.parts-drawer, .component-inspector { min-width: 0; background: var(--surface); overflow: hidden; }
+.parts-drawer { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border-right: 1px solid var(--line); }
+.component-inspector { display: grid; grid-template-rows: auto minmax(0, 1fr); border-left: 1px solid var(--line); }
+.workbench-panel-heading { padding: 15px 16px 13px; border-bottom: 1px solid var(--line); }
+.workbench-panel-heading > div { display: flex; align-items: baseline; gap: 8px; }
+.workbench-panel-heading h2 { margin: 0; font-size: .92rem; }
+.workbench-panel-heading p { margin: 6px 0 0; color: var(--muted); font-size: .67rem; }
+.parts-search { display: block; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.parts-search input { width: 100%; min-height: 36px; border: 1px solid #50584a; background: #10120f; color: var(--ink); padding: 7px 9px; }
+.illustrated-components { max-height: none; overflow: auto; }
+.part-item { grid-template-columns: 50px minmax(0, 1fr); gap: 9px; padding: 10px 12px; cursor: pointer; }
+.part-item:hover, .part-item:focus-visible { background: #222920; outline: none; box-shadow: inset 3px 0 #71c7ff; }
+.part-item.is-selected { background: #252b22; box-shadow: inset 3px 0 var(--accent); }
+.part-icon { height: 42px; }
+.part-icon svg { width: 52px; height: 34px; }
+.part-item strong { font-size: .7rem; }
+.part-item p { font-size: .66rem; }
+.part-item small { margin-top: 2px; font-size: .58rem; }
+.stock-badge { margin-top: 4px; font-size: .52rem; }
+.empty-parts { padding: 18px 14px; color: var(--muted); font-size: .72rem; }
+.hardware-total { grid-template-columns: 1fr 1fr; }
+.hardware-total > div { padding: 10px 12px; }
+.hardware-total strong { font-size: .92rem; }
+.construction-workspace { display: grid; grid-template-rows: 48px minmax(0, 1fr) 32px; min-width: 0; overflow: hidden; background: #0e100d; }
+.construction-tabs { min-height: 48px; padding: 0 12px; overflow-x: auto; }
+.construction-tabs button { flex: 0 0 auto; padding: 8px 12px; }
+.construction-tabs button.is-active { color: var(--ink); border-bottom-color: var(--accent); background: #1b1f19; }
+.construction-panel { min-height: 0; overflow: auto; padding: 18px; }
+.construction-section { min-width: 0; margin: 0; padding: 0; border: 0; }
+.workspace-view { min-height: 100%; }
+.canvas-zoom-surface { width: calc(100% * var(--workspace-zoom)); min-width: 680px; transform-origin: top left; }
+.canvas-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 16px; border-top: 1px solid var(--line); color: #8e9687; font-size: .6rem; }
+.graphic-heading { align-items: center; margin-bottom: 12px; }
+.graphic-heading h2 { font-size: 1.05rem; }
+.graphic-heading > span { color: var(--muted); font-size: .65rem; }
+.technical-svg { max-height: none; }
+.interactive-component.is-selected { filter: drop-shadow(0 0 7px rgba(215,255,63,.95)); }
+.interactive-component.is-selected .component-hitbox { fill: rgba(215,255,63,.13); stroke: #8ba528; stroke-dasharray: 6 3; }
+.offboard-controls { grid-template-columns: minmax(170px, 1fr) repeat(3, minmax(140px, 180px)); }
+.physical-pot.is-selected { border-color: var(--accent); box-shadow: inset 3px 0 var(--accent); }
+.hardware-controls { min-height: 0; overflow: auto; padding: 0 16px 24px; }
+.selected-part-summary { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 10px; padding: 16px 0; }
+.selected-part-icon { display: grid; place-items: center; height: 58px; background: #eef0e8; }
+.selected-part-icon svg { width: 64px; height: 44px; }
+.selected-part-icon svg path, .selected-part-icon svg rect, .selected-part-icon svg circle { fill: none; stroke: #222a20; stroke-width: 2; }
+.selected-part-icon svg text { fill: #222a20; font: 700 8px ui-monospace, monospace; }
+.selected-part-summary span { color: var(--accent); font: 750 .6rem ui-monospace, monospace; text-transform: uppercase; }
+.selected-part-summary h3 { margin: 2px 0; font-size: .84rem; line-height: 1.2; }
+.selected-part-summary strong { display: block; color: #d7ddce; font-size: .72rem; }
+.selected-part-summary p { margin: 5px 0 0; color: var(--muted); font-size: .63rem; }
+.selected-control { padding-top: 14px; }
+.engineering-options { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.engineering-options button { min-height: 30px; padding: 5px 7px; border: 1px solid #4a5245; background: #11130f; color: #d9ded1; font-size: .6rem; }
+.engineering-options button:hover, .engineering-options button:focus-visible, .engineering-options button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.inspector-note { margin: 10px 0 0; color: var(--muted); font-size: .64rem; }
+.locked-component { padding: 14px 0; border-top: 1px solid var(--line); }
+.locked-component strong { color: #ffd886; font-size: .75rem; }
+.locked-component p { margin: 6px 0 0; color: var(--muted); font-size: .66rem; }
+.hardware-calculation { margin-inline: -16px; }
+
+@media (max-width: 1180px) {
+  .hardware-toolbar { grid-template-columns: minmax(160px, .7fr) minmax(200px, 1fr) auto; }
+  .simulation-tools { grid-column: 1 / -1; justify-content: flex-start; }
+  .hardware-layout { grid-template-columns: 220px minmax(460px, 1fr) 280px; height: auto; min-height: 720px; }
+}
+
+@media (max-width: 900px) {
+  .hardware-toolbar { grid-template-columns: 1fr 1fr; }
+  .workbench-tools { justify-content: flex-end; }
+  .simulation-tools { grid-column: 1 / -1; }
+  .hardware-layout { grid-template-columns: 220px minmax(0, 1fr); height: auto; }
+  .component-inspector { grid-column: 1 / -1; min-height: 360px; border-left: 0; border-top: 1px solid var(--line); }
+  .hardware-controls { display: block; }
+}
+
+@media (max-width: 650px) {
+  .hardware-toolbar { display: flex; align-items: stretch; gap: 11px; }
+  .preset-field { width: 100%; }
+  .workbench-tools, .simulation-tools { flex-wrap: wrap; justify-content: flex-start; }
+  .zoom-control { flex: 1; }
+  .simulation-tools select { flex: 1; }
+  .hardware-layout { display: block; min-height: 0; }
+  .parts-drawer { height: 350px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .construction-workspace { min-height: 620px; }
+  .component-inspector { min-height: 420px; }
+  .construction-panel { padding: 12px; }
+  .canvas-footer { align-items: flex-start; flex-direction: column; }
+}
