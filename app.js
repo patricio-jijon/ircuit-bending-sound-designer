@@ -176,7 +176,14 @@ const state = {
   prices: {},
   hardwarePreset: "dual555",
   hardwareLoadedId: null,
-  constructionView: "schematic"
+  constructionView: "breadboard",
+  hardwareSelectedKey: "r1",
+  hardwareSelectedRef: "R1/R3",
+  hardwareSelectedIndex: 2,
+  hardwareHistory: [],
+  hardwareRedo: [],
+  partsFilter: "",
+  workspaceZoom: 100
 };
 
 let audio = {
@@ -903,14 +910,45 @@ function renderHardwareSelector() {
   $("#download-guide").href = hardwarePreset().guide;
 }
 
+function selectedHardwareComponent(preset = hardwarePreset()) {
+  return preset.components[state.hardwareSelectedIndex]
+    || preset.components.find((component) => component.valueKey === state.hardwareSelectedKey)
+    || preset.components[0];
+}
+
+function updateUndoButtons() {
+  $("#hardware-undo").disabled = state.hardwareHistory.length === 0;
+  $("#hardware-redo").disabled = state.hardwareRedo.length === 0;
+}
+
+function recordHardwareSnapshot() {
+  const snapshot = JSON.stringify(hardwarePreset().values);
+  if (state.hardwareHistory.at(-1) !== snapshot) state.hardwareHistory.push(snapshot);
+  if (state.hardwareHistory.length > 40) state.hardwareHistory.shift();
+  state.hardwareRedo = [];
+  updateUndoButtons();
+}
+
 function renderHardwareControls() {
   const preset = hardwarePreset();
-  $("#hardware-controls").innerHTML = `<p class="hardware-summary">${preset.summary}</p>${preset.controls.map((control) => `
-    <div class="hardware-control">
-      <div><label for="hardware-${control.key}"><span>${control.ref}</span>${control.label}</label><output id="hardware-value-${control.key}">${control.options?.find((option) => option.value === preset.values[control.key])?.label || `${preset.values[control.key]} ${control.unit || ""}`}</output></div>
-      ${control.type === "select" ? `<select id="hardware-${control.key}" data-hardware-key="${control.key}">${control.options.map((option) => `<option value="${option.value}"${option.value === preset.values[control.key] ? " selected" : ""}>${option.label}</option>`).join("")}</select>` : `<input id="hardware-${control.key}" type="range" min="${control.min}" max="${control.max}" step="${control.step}" value="${preset.values[control.key]}" data-hardware-key="${control.key}">`}
-    </div>`).join("")}
-    <div class="hardware-calculation">${hardwareCalculation(preset)}</div>`;
+  const component = selectedHardwareComponent(preset);
+  const control = component?.valueKey
+    ? preset.controls.find((item) => item.key === component.valueKey)
+    : preset.controls.find((item) => item.key === state.hardwareSelectedKey);
+  const value = component ? componentValue(component, preset) : "";
+  const editor = control ? `<div class="hardware-control selected-control">
+      <div><label for="hardware-${control.key}"><span>${control.ref}</span>${control.label}</label><output id="hardware-value-${control.key}">${hardwareValueLabel(control, preset.values[control.key])}</output></div>
+      ${control.type === "select"
+        ? `<select id="hardware-${control.key}" data-hardware-key="${control.key}">${control.options.map((option) => `<option value="${option.value}"${option.value === preset.values[control.key] ? " selected" : ""}>${option.label}</option>`).join("")}</select>`
+        : `<input id="hardware-${control.key}" type="range" min="${control.min}" max="${control.max}" step="${control.step}" value="${preset.values[control.key]}" data-hardware-key="${control.key}"><div class="engineering-options" aria-label="Common values">${engineeringChoices(control).map((option) => `<button type="button" data-inspector-choice="${option.value}"${String(option.value) === String(preset.values[control.key]) ? ` aria-pressed="true"` : ""}>${option.label}</button>`).join("")}</div>`}
+      <p class="inspector-note">${control.unit === "%" ? "This changes the control position during the behavioral simulation." : "Choose a supported value. The drawing, calculation, BOM, and sound target stay synchronized."}</p>
+    </div>` : `<div class="locked-component"><strong>Fixed in this verified preset</strong><p>This part has no approved substitution in the current circuit model. Its identity, polarity, package, and rating remain locked so the audited wiring stays valid.</p></div>`;
+  $("#hardware-controls").innerHTML = `<div class="selected-part-summary">
+      <div class="selected-part-icon">${componentIcon(component?.kind || "dip8")}</div>
+      <div><span>${component?.ref || "Preset"}</span><h3>${component?.name || preset.name}</h3><strong>${value}</strong><p>${component?.note || preset.summary}</p></div>
+    </div>${editor}<div class="hardware-calculation">${hardwareCalculation(preset)}</div>`;
+  $("#hardware-selection-status").textContent = component ? `${component.ref} selected · ${component.name}` : "Verified preset ready";
+  updateUndoButtons();
 }
 
 function syncAudioButtons() {
@@ -921,8 +959,8 @@ function syncAudioButtons() {
   headerButton.querySelector("span:last-child").textContent = state.audioOn ? "Stop audio" : "Start audio";
   hardwareButton.classList.toggle("is-on", state.audioOn);
   hardwareButton.setAttribute("aria-pressed", String(state.audioOn));
-  hardwareButton.textContent = state.audioOn ? "Stop sound" : "Start sound";
-  $("#hardware-audio-status").textContent = state.audioOn ? "Sound is playing · move a component control and listen" : "Sound model connected · press Start sound";
+  hardwareButton.textContent = state.audioOn ? "Stop simulation" : "Start simulation";
+  $("#hardware-audio-status").textContent = state.audioOn ? "Behavioral sound simulation running" : "Behavioral sound model stopped";
 }
 
 function hardwareCalculation(preset) {
@@ -946,19 +984,21 @@ function renderIllustratedBom() {
   const preset = hardwarePreset();
   let total = 0;
   let missingTotal = 0;
-  $("#illustrated-components").innerHTML = preset.components.map((component) => {
+  const filter = state.partsFilter.trim().toLowerCase();
+  const items = preset.components.map((component, index) => {
     total += component.qty * component.cost;
     const stock = inventoryMatch(component, preset);
     const control = component.valueKey ? preset.controls.find((item) => item.key === component.valueKey) : null;
-    const interactiveAttributes = control
-      ? ` interactive-component" role="button" tabindex="0" data-component-key="${control.key}" data-component-ref="${component.ref}" aria-label="Change ${component.ref}, currently ${componentValue(component, preset)}. Click, tap, or press Enter."`
-      : `"`;
     if (stock.missing) missingTotal += component.qty * component.cost;
-    return `<article class="part-item${interactiveAttributes}>
+    const searchText = `${component.ref} ${component.kind} ${component.name} ${componentValue(component, preset)}`.toLowerCase();
+    if (filter && !searchText.includes(filter)) return "";
+    const selected = index === state.hardwareSelectedIndex;
+    return `<article class="part-item${selected ? " is-selected" : ""}" role="button" tabindex="0" data-component-index="${index}"${control ? ` data-component-key="${control.key}"` : ""} data-component-ref="${component.ref}" aria-label="Inspect ${component.ref}, ${component.name}, ${componentValue(component, preset)}">
       <div class="part-icon">${componentIcon(component.kind)}</div>
-      <div><span>${component.ref} · qty ${component.qty}</span><strong>${component.name}</strong><p>${componentValue(component, preset)}</p><small>${component.note}</small><span class="stock-badge ${stock.className}">${stock.label}</span><a href="https://www.amazon.com/s?k=${encodeURIComponent(component.query)}" target="_blank" rel="noopener noreferrer">Find on Amazon US ↗</a></div>
+      <div><span>${component.ref} · qty ${component.qty}</span><strong>${component.name}</strong><p>${componentValue(component, preset)}</p><small>${control ? "Editable in this preset" : "Verified fixed part"}</small><span class="stock-badge ${stock.className}">${stock.label}</span></div>
     </article>`;
-  }).join("");
+  });
+  $("#illustrated-components").innerHTML = items.join("") || `<p class="empty-parts">No parts match “${state.partsFilter}”.</p>`;
   $("#hardware-cost").textContent = `$${total.toFixed(2)}`;
   $("#hardware-missing-cost").textContent = `$${missingTotal.toFixed(2)}`;
 }
@@ -999,7 +1039,7 @@ function engineeringChoices(control) {
 
 function interactiveSvgGroup(part, inner) {
   if (!part.valueKey) return inner;
-  return `<g class="interactive-component" data-component-key="${part.valueKey}" data-component-ref="${part.ref}" role="button" tabindex="0" aria-label="Change ${part.ref}. Click, tap, or press Enter."><title>${part.ref}: click or tap to change this component</title>${inner}</g>`;
+  return `<g class="interactive-component${state.hardwareSelectedKey === part.valueKey ? " is-selected" : ""}" data-component-key="${part.valueKey}" data-component-ref="${part.ref}" role="button" tabindex="0" aria-label="Inspect ${part.ref}. Click, tap, or press Enter."><title>${part.ref}: click or tap to inspect this component</title>${inner}</g>`;
 }
 
 function renderPotControls(preset) {
@@ -1009,7 +1049,7 @@ function renderPotControls(preset) {
     const value = preset.values[control.key];
     const turn = control.unit === "%" ? Number(value) : ((Number(value) - control.min) / (control.max - control.min)) * 100;
     const degrees = -135 + Math.max(0, Math.min(100, turn)) * 2.7;
-    return `<button type="button" class="interactive-component physical-pot" data-component-key="${control.key}" data-component-ref="${control.ref}" aria-label="${control.ref} ${control.label}, ${hardwareValueLabel(control, value)}. Click, tap, or press Enter to change."><span class="physical-knob" style="--pot-turn:${degrees}deg" aria-hidden="true"><i></i></span><span><b>${control.ref}</b><strong>${control.label}</strong><small>${hardwareValueLabel(control, value)}</small></span></button>`;
+    return `<button type="button" class="interactive-component physical-pot${state.hardwareSelectedKey === control.key ? " is-selected" : ""}" data-component-key="${control.key}" data-component-ref="${control.ref}" aria-label="${control.ref} ${control.label}, ${hardwareValueLabel(control, value)}. Click, tap, or press Enter to inspect."><span class="physical-knob" style="--pot-turn:${degrees}deg" aria-hidden="true"><i></i></span><span><b>${control.ref}</b><strong>${control.label}</strong><small>${hardwareValueLabel(control, value)}</small></span></button>`;
   }).join("")}</div>`;
 }
 
@@ -1019,7 +1059,7 @@ function schematicHotspots(preset) {
     opampFuzz: [["R3", "rin", 245, 365, 120, 65], ["R4", "rf", 335, 245, 110, 65], ["D1/D2", "diode", 335, 300, 125, 55], ["C4", "toneC", 660, 397, 100, 65], ["P1", "level", 748, 345, 185, 55]],
     glitchClock: [["P1", "clockR", 365, 115, 210, 70], ["C1", "clockC", 45, 320, 125, 90], ["P2", "depth", 670, 215, 240, 70]]
   };
-  return maps[preset.id].map(([ref,key,x,y,width,height]) => `<g class="interactive-component" data-component-key="${key}" data-component-ref="${ref}" role="button" tabindex="0" aria-label="Change ${ref}. Click, tap, or press Enter."><title>${ref}: click or tap to choose a real component value</title><rect class="component-hitbox" x="${x}" y="${y}" width="${width}" height="${height}" rx="5"/></g>`).join("");
+  return maps[preset.id].map(([ref,key,x,y,width,height]) => `<g class="interactive-component${state.hardwareSelectedKey === key ? " is-selected" : ""}" data-component-key="${key}" data-component-ref="${ref}" role="button" tabindex="0" aria-label="Inspect ${ref}. Click, tap, or press Enter."><title>${ref}: click or tap to inspect this component</title><rect class="component-hitbox" x="${x}" y="${y}" width="${width}" height="${height}" rx="5"/></g>`).join("");
 }
 
 function closeComponentMenu() {
@@ -1028,27 +1068,31 @@ function closeComponentMenu() {
   menu.innerHTML = "";
 }
 
-function openComponentMenu(target, clientX, clientY) {
+function selectHardwarePart(index, key, ref) {
   const preset = hardwarePreset();
-  const control = preset.controls.find((item) => item.key === target.dataset.componentKey);
-  if (!control) return;
-  const menu = $("#component-menu");
-  const current = preset.values[control.key];
-  const choices = engineeringChoices(control);
-  menu.innerHTML = `<div class="component-menu-heading"><span>${target.dataset.componentRef}</span><strong>${control.label}</strong><small>Current: ${hardwareValueLabel(control, current)}</small></div><div class="component-menu-options">${choices.map((option) => `<button type="button" role="menuitemradio" aria-checked="${String(String(option.value) === String(current))}" data-component-choice="${option.value}"><span>${option.label}</span><small>${choiceAvailability(control, option.value, current)}</small></button>`).join("")}</div><p>Browser audio is a calculated behavioral target. Disconnect physical power before replacing a part.</p>`;
-  menu.hidden = false;
-  menu.dataset.componentKey = control.key;
-  const width = 300;
-  const height = Math.min(430, menu.scrollHeight || 430);
-  menu.style.left = `${Math.max(8, Math.min(clientX, window.innerWidth - width - 8))}px`;
-  menu.style.top = `${Math.max(8, Math.min(clientY, window.innerHeight - height - 8))}px`;
-  menu.querySelector("button")?.focus();
+  let componentIndex = Number.isInteger(index) ? index : -1;
+  if (componentIndex < 0 && key) componentIndex = preset.components.findIndex((component) => component.valueKey === key);
+  if (componentIndex < 0 && ref) componentIndex = preset.components.findIndex((component) => component.ref.split(",").some((item) => ref.includes(item.trim())));
+  if (componentIndex < 0) componentIndex = 0;
+  const component = preset.components[componentIndex];
+  state.hardwareSelectedIndex = componentIndex;
+  state.hardwareSelectedKey = key || component.valueKey || "";
+  state.hardwareSelectedRef = ref || component.ref;
+  renderHardwareControls();
+  renderIllustratedBom();
+  renderConstruction();
+}
+
+function openComponentMenu(target, clientX, clientY) {
+  selectHardwarePart(Number(target.dataset.componentIndex), target.dataset.componentKey, target.dataset.componentRef);
+  closeComponentMenu();
 }
 
 async function applyHardwareChoice(key, rawValue) {
   const preset = hardwarePreset();
   const control = preset.controls.find((item) => item.key === key);
   if (!control) return;
+  recordHardwareSnapshot();
   const value = control.type === "select" ? rawValue : Number(rawValue);
   preset.values[key] = value;
   const module = state.modules[control.audio.module];
@@ -1132,12 +1176,20 @@ function renderConstruction() {
     const item = window.HARDWARE_PINOUTS[key];
     return `<section class="pinout-section"><h3>${item.identity}</h3><p>${item.orientation}</p><div class="connection-table-wrap"><table class="connection-table pinout-table"><thead><tr><th>Pin</th><th>Name</th><th>Role in this component</th></tr></thead><tbody>${item.pins.map(([number,name,role])=>`<tr><td>${number}</td><td><strong>${name}</strong></td><td>${role}</td></tr>`).join("")}</tbody></table></div><a href="${item.source}" target="_blank" rel="noopener noreferrer">Open manufacturer source ↗</a></section>`;
   }).join("");
-  panel.innerHTML = `
-    <section id="construction-schematic" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">1 · Interactive construction schematic</p><h2>${preset.name}</h2></div><span>Click or tap a highlighted part to change it</span></div>${schematicSvg(preset)}<p class="graphic-caption"><strong>Interactive:</strong> click or tap highlighted resistors, capacitors, diodes, and potentiometers to install an engineering value and hear the recalculated sound.</p></section>
-    <section id="construction-breadboard" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">2 · Interactive breadboard illustration</p><h2>Place the parts</h2></div><span>Top view · power disconnected</span></div>${breadboardSvg(preset)}${renderPotControls(preset)}<p class="graphic-caption"><strong>Interactive:</strong> click or tap labeled parts or physical knobs. Colored paths show jumpers; jacks are listed below.</p></section>
-    <section id="construction-connections" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">3 · Wire-by-wire table</p><h2>Make every connection</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${row[0]}</strong></td><td>${row.slice(1,-2).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${row.at(-1)}</td></tr>`).join("")}</tbody></table></div></section>
-    <section id="construction-pinouts" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">4 · Manufacturer-verified pinouts</p><h2>Orient each IC</h2></div><span>Top view · confirm notch before power</span></div>${pinouts}</section>
-    <section id="construction-assembly" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">5 · Step-by-step assembly</p><h2>Build with power disconnected</h2></div><span>Complete one step at a time</span></div><ol class="assembly-list">${preset.assembly.map((step,index)=>`<li><span>${String(index+1).padStart(2,"0")}</span><p>${step}</p></li>`).join("")}</ol></section>`;
+  const views = {
+    breadboard: `<section id="construction-breadboard" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Physical layout</p><h2>${preset.name} breadboard</h2></div><span>Select a labeled part to inspect it</span></div><div class="canvas-zoom-surface">${breadboardSvg(preset)}${renderPotControls(preset)}</div><p class="graphic-caption"><strong>Preset workspace:</strong> component values are editable; placement and wiring remain locked to the audited connection table in this version.</p></section>`,
+    schematic: `<section id="construction-schematic" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Electrical view</p><h2>${preset.name} schematic</h2></div><span>Highlighted targets share the component inspector</span></div><div class="canvas-zoom-surface">${schematicSvg(preset)}</div><p class="graphic-caption"><strong>Calculated and browser-simulated:</strong> this is not a physically measured result.</p></section>`,
+    connections: `<section id="construction-connections" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Authoritative netlist</p><h2>Wire-by-wire connections</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${row[0]}</strong></td><td>${row.slice(1,-2).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${row.at(-1)}</td></tr>`).join("")}</tbody></table></div></section>`,
+    pinouts: `<section id="construction-pinouts" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Manufacturer sources</p><h2>Package orientation and pins</h2></div><span>Top view · confirm notch before power</span></div>${pinouts}</section>`,
+    assembly: `<section id="construction-assembly" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Guided physical build</p><h2>Assemble with power disconnected</h2></div><span>Complete one step at a time</span></div><ol class="assembly-list">${preset.assembly.map((step,index)=>`<li><span>${String(index+1).padStart(2,"0")}</span><p>${step}</p></li>`).join("")}</ol></section>`
+  };
+  panel.innerHTML = views[state.constructionView] || views.breadboard;
+  panel.style.setProperty("--workspace-zoom", String(state.workspaceZoom / 100));
+  $$("[data-construction]").forEach((button) => {
+    const active = button.dataset.construction === state.constructionView;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
 }
 
 function renderHardwareSources() {
@@ -1146,11 +1198,56 @@ function renderHardwareSources() {
 }
 
 function renderHardware() {
+  const preset = hardwarePreset();
+  if (!preset.defaultValues) preset.defaultValues = { ...preset.values };
   renderHardwareSelector();
   renderHardwareControls();
   renderIllustratedBom();
   renderConstruction();
   renderHardwareSources();
+}
+
+function resetHardwareSelection() {
+  const preset = hardwarePreset();
+  const index = Math.max(0, preset.components.findIndex((component) => component.valueKey));
+  const component = preset.components[index];
+  state.hardwareSelectedIndex = index;
+  state.hardwareSelectedKey = component?.valueKey || "";
+  state.hardwareSelectedRef = component?.ref || "";
+  state.hardwareHistory = [];
+  state.hardwareRedo = [];
+  state.partsFilter = "";
+  $("#parts-search").value = "";
+}
+
+function restoreHardwareSnapshot(snapshot) {
+  const preset = hardwarePreset();
+  preset.values = JSON.parse(snapshot);
+  preset.controls.forEach((control) => {
+    const module = state.modules[control.audio.module];
+    if (module) module.params[control.audio.key] = preset.values[control.key];
+  });
+  renderHardwareControls();
+  renderIllustratedBom();
+  renderConstruction();
+  rebuildAudioGraph();
+  renderChain();
+  renderInspector();
+  updateUndoButtons();
+}
+
+function undoHardwareChange() {
+  if (!state.hardwareHistory.length) return;
+  state.hardwareRedo.push(JSON.stringify(hardwarePreset().values));
+  restoreHardwareSnapshot(state.hardwareHistory.pop());
+  announce("Component change undone.");
+}
+
+function redoHardwareChange() {
+  if (!state.hardwareRedo.length) return;
+  state.hardwareHistory.push(JSON.stringify(hardwarePreset().values));
+  restoreHardwareSnapshot(state.hardwareRedo.pop());
+  announce("Component change restored.");
 }
 
 function loadHardwareSound() {
@@ -1246,19 +1343,46 @@ function bindEvents() {
   $("#hardware-preset").addEventListener("change", (event) => {
     state.hardwarePreset = event.target.value;
     state.hardwareLoadedId = null;
+    resetHardwareSelection();
     renderHardware();
     loadHardwareSound();
     announce(`${hardwarePreset().name} build guide selected.`);
   });
-  $("#load-hardware-sound").addEventListener("click", loadHardwareSound);
+  $("#load-hardware-sound").addEventListener("click", () => {
+    const preset = hardwarePreset();
+    recordHardwareSnapshot();
+    preset.values = { ...preset.defaultValues };
+    renderHardware();
+    loadHardwareSound();
+    announce(`${preset.name} restored to its verified starting values.`);
+  });
+  $("#hardware-undo").addEventListener("click", undoHardwareChange);
+  $("#hardware-redo").addEventListener("click", redoHardwareChange);
+  $("#workspace-zoom").addEventListener("input", (event) => {
+    state.workspaceZoom = Number(event.target.value);
+    $("#workspace-zoom-value").textContent = `${state.workspaceZoom}%`;
+    $("#construction-panel").style.setProperty("--workspace-zoom", String(state.workspaceZoom / 100));
+  });
+  $("#parts-search").addEventListener("input", (event) => {
+    state.partsFilter = event.target.value;
+    renderIllustratedBom();
+  });
+  $("#hardware-controls").addEventListener("click", (event) => {
+    const choice = event.target.closest("[data-inspector-choice]");
+    if (!choice) return;
+    applyHardwareChoice(state.hardwareSelectedKey, choice.dataset.inspectorChoice);
+  });
   $("#hardware-controls").addEventListener("input", (event) => {
     const input = event.target.closest("[data-hardware-key]");
     if (!input) return;
     const preset = hardwarePreset();
     const control = preset.controls.find((item) => item.key === input.dataset.hardwareKey);
+    if (!input.dataset.historyRecorded) {
+      recordHardwareSnapshot();
+      input.dataset.historyRecorded = "true";
+    }
     preset.values[control.key] = control.type === "select" ? input.value : Number(input.value);
-    const selectedLabel = control.options?.find((option) => option.value === input.value)?.label;
-    $(`#hardware-value-${control.key}`).textContent = selectedLabel || `${input.value} ${control.unit || ""}`;
+    $(`#hardware-value-${control.key}`).textContent = hardwareValueLabel(control, preset.values[control.key]);
     if (state.hardwareLoadedId === preset.id) {
       const module = state.modules[control.audio.module];
       if (module) module.params[control.audio.key] = control.type === "select" ? input.value : Number(input.value);
@@ -1269,10 +1393,15 @@ function bindEvents() {
     renderConstruction();
     if (!state.audioOn) toggleAudio();
   });
+  $("#hardware-controls").addEventListener("change", (event) => {
+    const input = event.target.closest("[data-hardware-key]");
+    if (input) delete input.dataset.historyRecorded;
+  });
   $(".construction-tabs").addEventListener("click", (event) => {
     const button = event.target.closest("[data-construction]");
     if (!button) return;
-    $(`#construction-${button.dataset.construction}`).scrollIntoView({ behavior: "smooth", block: "start" });
+    state.constructionView = button.dataset.construction;
+    renderConstruction();
   });
   $("#construction-panel").addEventListener("contextmenu", (event) => {
     const component = event.target.closest(".interactive-component");
@@ -1290,7 +1419,11 @@ function bindEvents() {
     openComponentMenu(component, x, y);
   };
   $("#construction-panel").addEventListener("click", openComponentMenuFromClick);
-  $("#illustrated-components").addEventListener("click", openComponentMenuFromClick);
+  $("#illustrated-components").addEventListener("click", (event) => {
+    const component = event.target.closest("[data-component-index]");
+    if (!component) return;
+    selectHardwarePart(Number(component.dataset.componentIndex), component.dataset.componentKey, component.dataset.componentRef);
+  });
   $("#construction-panel").addEventListener("keydown", (event) => {
     const component = event.target.closest(".interactive-component");
     if (!component || !["Enter", " ", "ContextMenu"].includes(event.key)) return;
@@ -1299,11 +1432,10 @@ function bindEvents() {
     openComponentMenu(component, rect.left + Math.min(rect.width, 30), rect.top + Math.min(rect.height, 30));
   });
   $("#illustrated-components").addEventListener("keydown", (event) => {
-    const component = event.target.closest(".interactive-component");
-    if (!component || !["Enter", " ", "ContextMenu"].includes(event.key)) return;
+    const component = event.target.closest("[data-component-index]");
+    if (!component || !["Enter", " "].includes(event.key)) return;
     event.preventDefault();
-    const rect = component.getBoundingClientRect();
-    openComponentMenu(component, rect.left + Math.min(rect.width, 30), rect.top + Math.min(rect.height, 30));
+    selectHardwarePart(Number(component.dataset.componentIndex), component.dataset.componentKey, component.dataset.componentRef);
   });
   $("#component-menu").addEventListener("click", (event) => {
     const choice = event.target.closest("[data-component-choice]");
