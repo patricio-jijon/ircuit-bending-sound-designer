@@ -183,7 +183,11 @@ const state = {
   hardwareHistory: [],
   hardwareRedo: [],
   partsFilter: "",
-  workspaceZoom: 100
+  workspaceZoom: 100,
+  plannerController: "uno-r4",
+  selectedDeviceIds: [],
+  deviceSearch: "",
+  deviceCategory: "All"
 };
 
 let audio = {
@@ -1266,11 +1270,86 @@ function loadHardwareSound() {
   announce(`${preset.name} sound model connected. Press Start sound, then change a component.`);
 }
 
+function plannerController() {
+  return window.DEVICE_CONTROLLERS.find((item) => item.id === state.plannerController) || window.DEVICE_CONTROLLERS[0];
+}
+
+function selectedPlannerDevices() {
+  return state.selectedDeviceIds.map((id) => window.DEVICE_LIBRARY.find((item) => item.id === id)).filter(Boolean);
+}
+
+function deviceChecks(controller, devices) {
+  const checks = [];
+  const ids = new Set(devices.map((device) => device.id));
+  if (!devices.length) return [{severity:"info",title:"Choose devices",text:"Add at least one sensor, output, chip, or module to generate a pre-build plan."}];
+  devices.forEach((device) => {
+    const analogBridge = controller.noAdc && device.interfaces.includes("analog") && ids.has("mcp3008");
+    const supported = analogBridge || device.interfaces.some((name) => controller.interfaces.includes(name));
+    if (!supported) checks.push({severity:"stop",title:`${device.name}: interface unavailable`,text:`${controller.name} does not expose a supported ${device.interfaces.join(" / ")} interface in this planner.`});
+    if (controller.noAdc && device.interfaces.includes("analog") && !ids.has("mcp3008")) checks.push({severity:"stop",title:`${device.name}: ADC required`,text:`${controller.name} has no general-purpose analog input. Add the MCP3008 ADC or another verified converter.`});
+    if (controller.logic === 3.3 && device.logic === 5) checks.push({severity:"stop",title:`${device.name}: 5 V signal risk`,text:`Protect ${controller.name}'s 3.3 V GPIO with an appropriate level shifter or divider. Never apply a 5 V output directly.`});
+    if (controller.logic === 5 && device.logic === 3.3) checks.push({severity:"warn",title:`${device.name}: mixed logic levels`,text:"Confirm that the device input tolerates 5 V and that its 3.3 V output meets the controller's HIGH threshold; add translation when uncertain."});
+    if (device.driver === "hbridge" && ![...ids].some((id) => window.DEVICE_LIBRARY.find((item) => item.id === id)?.driverFor === "hbridge")) checks.push({severity:"stop",title:`${device.name}: motor driver missing`,text:"Add a verified H-bridge such as L293D only if its voltage and current ratings exceed the motor's measured stall requirement."});
+    if (device.driver === "uln2003" && !ids.has("uln2003")) checks.push({severity:"stop",title:`${device.name}: ULN2003 driver missing`,text:"Add the ULN2003A driver board or IC before connecting this stepper."});
+    if (device.driver === "resistor") checks.push({severity:"warn",title:`${device.name}: current limiting`,text:"Calculate and install a series resistor from supply voltage, LED forward voltage, and target current."});
+    if (device.externalPower) checks.push({severity:"warn",title:`${device.name}: external power`,text:"Use a supply sized for startup or stall current, add appropriate protection, and connect its ground to controller ground."});
+    if (device.verify) checks.push({severity:"warn",title:`${device.name}: exact model required`,text:device.note});
+  });
+  const addresses = new Map();
+  devices.filter((device) => device.address).forEach((device) => {
+    if (addresses.has(device.address)) checks.push({severity:"warn",title:"Possible I²C address conflict",text:`${addresses.get(device.address)} and ${device.name} list ${device.address}. Verify actual address straps before wiring.`});
+    addresses.set(device.address, device.name);
+  });
+  if (!checks.some((check) => check.severity === "stop")) checks.unshift({severity:"ready",title:"No blocking rule found",text:"This is a compatibility pre-check, not proof of a safe circuit. Verify every exact part, rating, pinout, and supply before assembly."});
+  checks.push({severity:"info",title:"Shared reference",text:"All signal-connected supplies need a common ground unless a specifically designed isolation barrier is used."});
+  return checks;
+}
+
+function suggestedDeviceConnection(controller, device, devices) {
+  const ids = new Set(devices.map((item) => item.id));
+  let iface = device.interfaces.find((name) => controller.interfaces.includes(name));
+  if (controller.noAdc && device.interfaces.includes("analog") && ids.has("mcp3008")) iface = "spi";
+  if (!iface) return {iface:"Unsupported",pins:"No compatible interface",support:"Choose a different controller or verified interface adapter."};
+  let pins = controller.pins[iface] || `${iface.toUpperCase()} pins: select after datasheet review`;
+  let support = device.note;
+  if (device.id === "hcsr04" && controller.logic === 3.3) support = "TRIG from a GPIO; ECHO through a calculated divider or 5-to-3.3 V translator.";
+  if (device.driver === "hbridge") support = "Controller PWM/direction → H-bridge inputs; H-bridge outputs → motor; separate motor supply; common ground.";
+  if (device.driver === "uln2003") support = "Four controller outputs → ULN2003 inputs; driver outputs → stepper coils; external 5 V motor supply; common ground.";
+  if (device.externalPower && !device.driver) support += " Use external load power and join grounds.";
+  if (device.id === "mcp3008") support = "Power VDD and VREF at controller logic voltage; connect SPI plus AGND/DGND; analog sensors go to CH0–CH7.";
+  return {iface:iface.toUpperCase(),pins,support};
+}
+
+function renderDevicePlanner() {
+  const controller = plannerController();
+  const devices = selectedPlannerDevices();
+  $("#planner-controller").innerHTML = window.DEVICE_CONTROLLERS.map((item) => `<option value="${item.id}"${item.id === controller.id ? " selected" : ""}>${item.name} · ${item.logic} V logic</option>`).join("");
+  $("#planner-library-count").textContent = `${window.DEVICE_CONTROLLERS.length} boards · ${window.DEVICE_LIBRARY.length} devices`;
+  const categories = ["All", ...new Set(window.DEVICE_LIBRARY.map((item) => item.category))];
+  $("#device-filters").innerHTML = categories.map((category) => `<button type="button" data-device-category="${category}"${state.deviceCategory === category ? ` aria-pressed="true"` : ""}>${category}</button>`).join("");
+  const search = state.deviceSearch.trim().toLowerCase();
+  const shown = window.DEVICE_LIBRARY.filter((device) => (state.deviceCategory === "All" || device.category === state.deviceCategory) && (!search || `${device.name} ${device.model} ${device.category} ${device.interfaces.join(" ")}`.toLowerCase().includes(search)));
+  $("#device-catalog").innerHTML = shown.map((device) => {
+    const added = state.selectedDeviceIds.includes(device.id);
+    return `<article class="device-card${added ? " is-added" : ""}"><div><span>${device.category}</span><h3>${device.name}</h3><p>${device.model}</p></div><div class="device-tags"><span>${device.logic === "passive" || device.logic === "analog" || device.logic === "load" || device.logic === "unknown" ? device.logic : `${device.logic} V logic`}</span>${device.interfaces.map((name) => `<span>${name.toUpperCase()}</span>`).join("")}</div><button type="button" data-device-add="${device.id}"${added ? " disabled" : ""}>${added ? "Added" : "Add"}</button></article>`;
+  }).join("") || `<p class="empty-parts">No supported devices match this filter.</p>`;
+  $("#selected-devices").innerHTML = devices.length ? devices.map((device, index) => `<article class="selected-device"><span>${String(index + 1).padStart(2,"0")}</span><div><h3>${device.name}</h3><p>${device.model} · ${device.supply || "Supply determined by circuit"}</p></div><button type="button" data-device-remove="${device.id}" aria-label="Remove ${device.name}">×</button></article>`).join("") : `<div class="empty-build"><strong>No devices selected</strong><p>Choose parts from the supported library to build a compatibility and connection plan.</p></div>`;
+  const rows = devices.map((device) => {
+    const connection = suggestedDeviceConnection(controller, device, devices);
+    return `<tr><td><strong>${device.name}</strong></td><td>${connection.iface}</td><td>${connection.pins}</td><td>${connection.support}</td></tr>`;
+  }).join("");
+  $("#connection-plan-content").innerHTML = devices.length ? `<div class="controller-summary"><span>Controller</span><strong>${controller.name}</strong><p>${controller.logic} V GPIO · ${controller.supply}</p><small>${controller.note}</small></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Device</th><th>Interface</th><th>Example controller pins</th><th>Required support / connection</th></tr></thead><tbody>${rows}</tbody></table></div><p class="planner-disclaimer">Example pins are a starting assignment. Confirm conflicts with code, shields, boot pins, alternate functions, and the exact board pinout before construction.</p>` : `<p class="empty-parts">The connection plan appears after devices are added.</p>`;
+  const checks = deviceChecks(controller, devices);
+  const stopCount = checks.filter((check) => check.severity === "stop").length;
+  $("#compatibility-report").innerHTML = `<div class="report-summary ${stopCount ? "has-stops" : "is-ready"}"><span>${stopCount ? "Do not wire yet" : "Ready for detailed design"}</span><strong>${stopCount ? `${stopCount} blocking item${stopCount === 1 ? "" : "s"}` : "Pre-check complete"}</strong></div>${checks.map((check) => `<article class="check-item ${check.severity}"><span>${check.severity}</span><strong>${check.title}</strong><p>${check.text}</p></article>`).join("")}<div class="planner-safety"><strong>Low-voltage boundary</strong><p>Use only 3.3–12 V DC student circuits. Motors, servos, batteries, pumps, and soldering require supervision. Do not connect household mains.</p></div>`;
+}
+
 function showView(viewId) {
   $$(".view").forEach((view) => { view.hidden = view.id !== viewId; view.classList.toggle("is-active", view.id === viewId); });
   $$(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === viewId));
   if (viewId === "build") renderBom();
   if (viewId === "hardware") renderHardware();
+  if (viewId === "devices") renderDevicePlanner();
   if (window.location.hash !== `#${viewId}`) history.replaceState(null, "", `#${viewId}`);
   const heading = $(`#${viewId} h1`);
   if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
@@ -1446,6 +1525,39 @@ function bindEvents() {
     if (!event.target.closest("#component-menu") && !event.target.closest(".interactive-component")) closeComponentMenu();
   });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeComponentMenu(); });
+  $("#planner-controller").addEventListener("change", (event) => {
+    state.plannerController = event.target.value;
+    renderDevicePlanner();
+  });
+  $("#device-search").addEventListener("input", (event) => {
+    state.deviceSearch = event.target.value;
+    renderDevicePlanner();
+    $("#device-search").focus();
+  });
+  $("#device-filters").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-device-category]");
+    if (!button) return;
+    state.deviceCategory = button.dataset.deviceCategory;
+    renderDevicePlanner();
+  });
+  $("#device-catalog").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-device-add]");
+    if (!button || state.selectedDeviceIds.includes(button.dataset.deviceAdd)) return;
+    state.selectedDeviceIds.push(button.dataset.deviceAdd);
+    renderDevicePlanner();
+    announce("Device added to the pre-build plan.");
+  });
+  $("#selected-devices").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-device-remove]");
+    if (!button) return;
+    state.selectedDeviceIds = state.selectedDeviceIds.filter((id) => id !== button.dataset.deviceRemove);
+    renderDevicePlanner();
+  });
+  $("#planner-clear").addEventListener("click", () => {
+    state.selectedDeviceIds = [];
+    renderDevicePlanner();
+    announce("Pre-build selection cleared.");
+  });
   $("#experiment-form").addEventListener("submit", (event) => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
@@ -1462,9 +1574,9 @@ renderHardware();
 loadHardwareSound();
 syncAudioButtons();
 const initialView = window.location.hash.slice(1);
-showView(["studio", "learn", "build", "hardware", "experiment"].includes(initialView) ? initialView : "hardware");
+showView(["studio", "learn", "build", "hardware", "devices", "experiment"].includes(initialView) ? initialView : "hardware");
 window.addEventListener("hashchange", () => {
   const view = window.location.hash.slice(1);
-  if (["studio", "learn", "build", "hardware", "experiment"].includes(view)) showView(view);
+  if (["studio", "learn", "build", "hardware", "devices", "experiment"].includes(view)) showView(view);
 });
 drawScopes();
