@@ -6,8 +6,9 @@
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
   <link rel="stylesheet" href="styles.css?v=7">
-  <script src="hardware-data.js?v=7" defer></script>
-  <script src="app.js?v=7" defer></script>
+  <script src="hardware-data.js?v=8" defer></script>
+  <script src="devices-data.js?v=8" defer></script>
+  <script src="app.js?v=8" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -22,6 +23,7 @@
       <button class="tab" type="button" data-view="learn">Learn</button>
       <button class="tab" type="button" data-view="build">Build &amp; budget</button>
       <button class="tab is-active" type="button" data-view="hardware">Circuit builder</button>
+      <button class="tab" type="button" data-view="devices">Device planner</button>
       <button class="tab" type="button" data-view="experiment">Experiment</button>
     </nav>
     <button id="audio-toggle" class="audio-toggle" type="button" aria-pressed="false">
@@ -217,6 +219,33 @@
         <p>Disconnect power before changing any connection. Use a current-limited 9 V DC supply. Outputs are intended for a powered speaker, amplifier, or audio interface input, never a bare low-impedance speaker. Confirm breadboard rail continuity and polarized capacitor orientation before power-up.</p>
         <div id="hardware-sources" class="hardware-sources"></div>
       </section>
+    </section>
+
+    <section id="devices" class="view devices-view" aria-labelledby="devices-title" hidden>
+      <header class="devices-toolbar">
+        <div><span class="section-number">Pre-build compatibility</span><h1 id="devices-title">Device Planner</h1></div>
+        <label for="planner-controller"><span>Controller board</span><select id="planner-controller"></select></label>
+        <div class="planner-count"><span>Supported library</span><strong id="planner-library-count">0 devices</strong></div>
+        <button id="planner-clear" class="secondary-button" type="button">Clear build</button>
+      </header>
+      <div class="devices-status"><span class="status-dot" aria-hidden="true"></span><strong>Plan before wiring</strong><span>Checks logic voltage, interfaces, ADC needs, drivers, external power, and shared grounds.</span></div>
+      <div class="devices-layout">
+        <aside class="device-library" aria-labelledby="device-library-title">
+          <div class="workbench-panel-heading"><div><span class="section-number">Library</span><h2 id="device-library-title">Boards, chips, and devices</h2></div><p>This is the complete supported library. Exact unlisted modules still require their datasheet or a clear photo.</p></div>
+          <label class="parts-search" for="device-search"><span class="sr-only">Search device library</span><input id="device-search" type="search" placeholder="Search sensor, motor, chip…" autocomplete="off"></label>
+          <div id="device-filters" class="device-filters" aria-label="Device categories"></div>
+          <div id="device-catalog" class="device-catalog"></div>
+        </aside>
+        <main class="build-mixer" aria-labelledby="build-mixer-title">
+          <div class="planner-section-heading"><div><span class="section-number">Selected build</span><h2 id="build-mixer-title">Connect and mix devices</h2></div><p>Add devices from the library. The planner assigns interface examples and explains required support hardware.</p></div>
+          <div id="selected-devices" class="selected-devices"></div>
+          <section class="connection-plan" aria-labelledby="connection-plan-title"><div class="planner-section-heading compact"><div><span class="section-number">Suggested wiring</span><h2 id="connection-plan-title">Connection plan</h2></div></div><div id="connection-plan-content"></div></section>
+        </main>
+        <aside class="compatibility-panel" aria-labelledby="compatibility-title">
+          <div class="workbench-panel-heading"><div><span class="section-number">Checks</span><h2 id="compatibility-title">Pre-build report</h2></div><p>Resolve every stop item before connecting power.</p></div>
+          <div id="compatibility-report" class="compatibility-report" aria-live="polite"></div>
+        </aside>
+      </div>
     </section>
 
     <section id="experiment" class="view content-view" aria-labelledby="experiment-title" hidden>
