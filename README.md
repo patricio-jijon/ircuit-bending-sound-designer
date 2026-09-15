@@ -34,9 +34,10 @@ GitHub will provide the public URL after deployment completes.
 - Dimension-based generic open-top enclosure STL export
 - Hardware Lab with synchronized schematics, named breadboard holes, canonical connection tables, power-off assembly steps, component illustrations, and preset-specific Amazon searches
 - Circuit Builder opens first and keeps the selected preset connected to the browser sound model
+- Tinkercad-inspired physical workspace with a searchable parts library, single breadboard/schematic canvas, contextual component inspector, zoom, and undo/redo
 - Resistor, capacitor, potentiometer, diode-material, and transistor-model exploration controls
 - STEM Center inventory status for stocked, unverified, and additional-purchase parts, with separate purchase estimate
-- All construction sections remain visible together: schematic, breadboard, connections, pinouts, and assembly
+- Breadboard, schematic, connections, pinouts, and assembly are focused workspace views rather than one long document
 - Click/tap component editing directly on the schematic, breadboard, off-board knobs, and adjustable parts-tray entries (right-click remains supported)
 - Engineering-series replacement menus synchronized with calculations, drawings, BOM, STEM inventory status, and browser audio
 - Visible off-board potentiometer controls; P1 and P2 independently set the two physical NE555 timing networks
