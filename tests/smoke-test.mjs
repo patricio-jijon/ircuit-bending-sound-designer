@@ -43,6 +43,8 @@ assert.match(js, /function syncAudioButtons/);
 assert.match(js, /function inventoryMatch/);
 assert.match(js, /function openComponentMenu/);
 assert.match(js, /contextmenu/);
+assert.match(js, /addEventListener\("click", openComponentMenuFromClick\)/);
+assert.match(js, /Click, tap, or press Enter/);
 assert.match(js, /data-component-key/);
 assert.match(js, /Transistor model/);
 for (const section of ["schematic", "breadboard", "connections", "pinouts", "assembly"]) {
