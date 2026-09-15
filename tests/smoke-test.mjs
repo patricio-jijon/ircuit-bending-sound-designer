@@ -14,6 +14,7 @@ const [html, css, js, hardware, readme] = await Promise.all([
 ]);
 
 assert.match(html, /<title>Circuit Bending Sound Designer<\/title>/);
+assert.match(html, /app\.js\?v=7/);
 assert.match(html, /id="audio-toggle"/);
 assert.match(html, /id="signal-chain"/);
 assert.match(html, /id="bom-body"/);
@@ -22,6 +23,10 @@ assert.match(html, /id="hardware-preset"/);
 assert.match(html, /id="hardware-audio-toggle"/);
 assert.match(html, /id="hardware-source-select"/);
 assert.match(html, /id="component-menu"/);
+assert.match(html, /id="parts-search"/);
+assert.match(html, /id="component-inspector-title"/);
+assert.match(html, /id="workspace-zoom"/);
+assert.match(html, /id="hardware-undo"/);
 assert.match(html, /id="hardware" class="view hardware-view is-active"/);
 assert.match(html, /id="construction-panel"/);
 assert.match(html, /aria-live="polite"/);
@@ -42,6 +47,9 @@ assert.match(js, /function schematicSvg/);
 assert.match(js, /function syncAudioButtons/);
 assert.match(js, /function inventoryMatch/);
 assert.match(js, /function openComponentMenu/);
+assert.match(js, /function selectHardwarePart/);
+assert.match(js, /function undoHardwareChange/);
+assert.match(js, /state\.constructionView = button\.dataset\.construction/);
 assert.match(js, /contextmenu/);
 assert.match(js, /addEventListener\("click", openComponentMenuFromClick\)/);
 assert.match(js, /Click, tap, or press Enter/);
@@ -57,6 +65,8 @@ for (const preset of ["dual555", "opampFuzz", "glitchClock"]) {
 assert.match(hardware, /pin 8 · E10/);
 assert.match(hardware, /pin 14 · E10/);
 assert.match(css, /prefers-reduced-motion/);
+assert.match(css, /Physical computing workspace/);
+assert.match(css, /grid-template-columns: 248px minmax\(520px, 1fr\) 310px/);
 assert.match(readme, /GitHub Pages/);
 
 console.log("Static smoke tests passed: structure, modules, accessibility hooks, audio limiter, purchasing, and STL export.");
