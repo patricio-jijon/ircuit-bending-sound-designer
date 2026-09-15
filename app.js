@@ -949,8 +949,12 @@ function renderIllustratedBom() {
   $("#illustrated-components").innerHTML = preset.components.map((component) => {
     total += component.qty * component.cost;
     const stock = inventoryMatch(component, preset);
+    const control = component.valueKey ? preset.controls.find((item) => item.key === component.valueKey) : null;
+    const interactiveAttributes = control
+      ? ` interactive-component" role="button" tabindex="0" data-component-key="${control.key}" data-component-ref="${component.ref}" aria-label="Change ${component.ref}, currently ${componentValue(component, preset)}. Click, tap, or press Enter."`
+      : `"`;
     if (stock.missing) missingTotal += component.qty * component.cost;
-    return `<article class="part-item">
+    return `<article class="part-item${interactiveAttributes}>
       <div class="part-icon">${componentIcon(component.kind)}</div>
       <div><span>${component.ref} · qty ${component.qty}</span><strong>${component.name}</strong><p>${componentValue(component, preset)}</p><small>${component.note}</small><span class="stock-badge ${stock.className}">${stock.label}</span><a href="https://www.amazon.com/s?k=${encodeURIComponent(component.query)}" target="_blank" rel="noopener noreferrer">Find on Amazon US ↗</a></div>
     </article>`;
@@ -995,17 +999,17 @@ function engineeringChoices(control) {
 
 function interactiveSvgGroup(part, inner) {
   if (!part.valueKey) return inner;
-  return `<g class="interactive-component" data-component-key="${part.valueKey}" data-component-ref="${part.ref}" role="button" tabindex="0" aria-label="Change ${part.ref}. Right-click or press Enter."><title>${part.ref}: right-click to change this component</title>${inner}</g>`;
+  return `<g class="interactive-component" data-component-key="${part.valueKey}" data-component-ref="${part.ref}" role="button" tabindex="0" aria-label="Change ${part.ref}. Click, tap, or press Enter."><title>${part.ref}: click or tap to change this component</title>${inner}</g>`;
 }
 
 function renderPotControls(preset) {
   const controls = preset.controls.filter((control) => /^P\d/.test(control.ref));
   if (!controls.length) return "";
-  return `<div class="offboard-controls" aria-label="Interactive off-board potentiometers"><div><span>Off-board controls</span><strong>Right-click a knob to set it and hear the result</strong></div>${controls.map((control) => {
+  return `<div class="offboard-controls" aria-label="Interactive off-board potentiometers"><div><span>Off-board controls</span><strong>Click or tap a knob to set it and hear the result</strong></div>${controls.map((control) => {
     const value = preset.values[control.key];
     const turn = control.unit === "%" ? Number(value) : ((Number(value) - control.min) / (control.max - control.min)) * 100;
     const degrees = -135 + Math.max(0, Math.min(100, turn)) * 2.7;
-    return `<button type="button" class="interactive-component physical-pot" data-component-key="${control.key}" data-component-ref="${control.ref}" aria-label="${control.ref} ${control.label}, ${hardwareValueLabel(control, value)}. Right-click or press Enter to change."><span class="physical-knob" style="--pot-turn:${degrees}deg" aria-hidden="true"><i></i></span><span><b>${control.ref}</b><strong>${control.label}</strong><small>${hardwareValueLabel(control, value)}</small></span></button>`;
+    return `<button type="button" class="interactive-component physical-pot" data-component-key="${control.key}" data-component-ref="${control.ref}" aria-label="${control.ref} ${control.label}, ${hardwareValueLabel(control, value)}. Click, tap, or press Enter to change."><span class="physical-knob" style="--pot-turn:${degrees}deg" aria-hidden="true"><i></i></span><span><b>${control.ref}</b><strong>${control.label}</strong><small>${hardwareValueLabel(control, value)}</small></span></button>`;
   }).join("")}</div>`;
 }
 
@@ -1015,7 +1019,7 @@ function schematicHotspots(preset) {
     opampFuzz: [["R3", "rin", 245, 365, 120, 65], ["R4", "rf", 335, 245, 110, 65], ["D1/D2", "diode", 335, 300, 125, 55], ["C4", "toneC", 660, 397, 100, 65], ["P1", "level", 748, 345, 185, 55]],
     glitchClock: [["P1", "clockR", 365, 115, 210, 70], ["C1", "clockC", 45, 320, 125, 90], ["P2", "depth", 670, 215, 240, 70]]
   };
-  return maps[preset.id].map(([ref,key,x,y,width,height]) => `<g class="interactive-component" data-component-key="${key}" data-component-ref="${ref}" role="button" tabindex="0" aria-label="Change ${ref}. Right-click or press Enter."><title>${ref}: right-click to choose a real component value</title><rect class="component-hitbox" x="${x}" y="${y}" width="${width}" height="${height}" rx="5"/></g>`).join("");
+  return maps[preset.id].map(([ref,key,x,y,width,height]) => `<g class="interactive-component" data-component-key="${key}" data-component-ref="${ref}" role="button" tabindex="0" aria-label="Change ${ref}. Click, tap, or press Enter."><title>${ref}: click or tap to choose a real component value</title><rect class="component-hitbox" x="${x}" y="${y}" width="${width}" height="${height}" rx="5"/></g>`).join("");
 }
 
 function closeComponentMenu() {
@@ -1129,8 +1133,8 @@ function renderConstruction() {
     return `<section class="pinout-section"><h3>${item.identity}</h3><p>${item.orientation}</p><div class="connection-table-wrap"><table class="connection-table pinout-table"><thead><tr><th>Pin</th><th>Name</th><th>Role in this component</th></tr></thead><tbody>${item.pins.map(([number,name,role])=>`<tr><td>${number}</td><td><strong>${name}</strong></td><td>${role}</td></tr>`).join("")}</tbody></table></div><a href="${item.source}" target="_blank" rel="noopener noreferrer">Open manufacturer source ↗</a></section>`;
   }).join("");
   panel.innerHTML = `
-    <section id="construction-schematic" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">1 · Interactive construction schematic</p><h2>${preset.name}</h2></div><span>Hover a blue target · right-click to change a part</span></div>${schematicSvg(preset)}<p class="graphic-caption"><strong>Interactive:</strong> right-click highlighted resistors, capacitors, diodes, and potentiometers to install an engineering value and hear the recalculated sound.</p></section>
-    <section id="construction-breadboard" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">2 · Interactive breadboard illustration</p><h2>Place the parts</h2></div><span>Top view · power disconnected</span></div>${breadboardSvg(preset)}${renderPotControls(preset)}<p class="graphic-caption"><strong>Interactive:</strong> hover and right-click labeled parts or physical knobs. Colored paths show jumpers; jacks are listed below.</p></section>
+    <section id="construction-schematic" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">1 · Interactive construction schematic</p><h2>${preset.name}</h2></div><span>Click or tap a highlighted part to change it</span></div>${schematicSvg(preset)}<p class="graphic-caption"><strong>Interactive:</strong> click or tap highlighted resistors, capacitors, diodes, and potentiometers to install an engineering value and hear the recalculated sound.</p></section>
+    <section id="construction-breadboard" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">2 · Interactive breadboard illustration</p><h2>Place the parts</h2></div><span>Top view · power disconnected</span></div>${breadboardSvg(preset)}${renderPotControls(preset)}<p class="graphic-caption"><strong>Interactive:</strong> click or tap labeled parts or physical knobs. Colored paths show jumpers; jacks are listed below.</p></section>
     <section id="construction-connections" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">3 · Wire-by-wire table</p><h2>Make every connection</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${row[0]}</strong></td><td>${row.slice(1,-2).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${row.at(-1)}</td></tr>`).join("")}</tbody></table></div></section>
     <section id="construction-pinouts" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">4 · Manufacturer-verified pinouts</p><h2>Orient each IC</h2></div><span>Top view · confirm notch before power</span></div>${pinouts}</section>
     <section id="construction-assembly" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">5 · Step-by-step assembly</p><h2>Build with power disconnected</h2></div><span>Complete one step at a time</span></div><ol class="assembly-list">${preset.assembly.map((step,index)=>`<li><span>${String(index+1).padStart(2,"0")}</span><p>${step}</p></li>`).join("")}</ol></section>`;
@@ -1276,7 +1280,25 @@ function bindEvents() {
     event.preventDefault();
     openComponentMenu(component, event.clientX, event.clientY);
   });
+  const openComponentMenuFromClick = (event) => {
+    if (event.target.closest("a")) return;
+    const component = event.target.closest(".interactive-component");
+    if (!component) return;
+    const rect = component.getBoundingClientRect();
+    const x = event.clientX || rect.left + Math.min(rect.width, 30);
+    const y = event.clientY || rect.top + Math.min(rect.height, 30);
+    openComponentMenu(component, x, y);
+  };
+  $("#construction-panel").addEventListener("click", openComponentMenuFromClick);
+  $("#illustrated-components").addEventListener("click", openComponentMenuFromClick);
   $("#construction-panel").addEventListener("keydown", (event) => {
+    const component = event.target.closest(".interactive-component");
+    if (!component || !["Enter", " ", "ContextMenu"].includes(event.key)) return;
+    event.preventDefault();
+    const rect = component.getBoundingClientRect();
+    openComponentMenu(component, rect.left + Math.min(rect.width, 30), rect.top + Math.min(rect.height, 30));
+  });
+  $("#illustrated-components").addEventListener("keydown", (event) => {
     const component = event.target.closest(".interactive-component");
     if (!component || !["Enter", " ", "ContextMenu"].includes(event.key)) return;
     event.preventDefault();
