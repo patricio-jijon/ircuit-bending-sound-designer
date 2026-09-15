@@ -35,6 +35,9 @@ for (const [key, preset] of Object.entries(window.HARDWARE_PRESETS)) {
     assert(hole.test(from), `${key}: invalid hole ${from}`);
     assert(hole.test(to), `${key}: invalid hole ${to}`);
   }
+  for (const placement of preset.placements) {
+    if (placement.valueKey) assert(preset.controls.some((control) => control.key === placement.valueKey), `${key}: placement ${placement.ref} has unknown value key`);
+  }
   for (const pinoutKey of preset.pinouts) {
     const pinout = window.HARDWARE_PINOUTS[pinoutKey];
     assert(pinout?.source.startsWith("https://"));

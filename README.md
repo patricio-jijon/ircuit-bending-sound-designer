@@ -37,13 +37,16 @@ GitHub will provide the public URL after deployment completes.
 - Resistor, capacitor, potentiometer, diode-material, and transistor-model exploration controls
 - STEM Center inventory status for stocked, unverified, and additional-purchase parts, with separate purchase estimate
 - All construction sections remain visible together: schematic, breadboard, connections, pinouts, and assembly
+- Hover and right-click component editing directly on the schematic and breadboard
+- Engineering-series replacement menus synchronized with calculations, drawings, BOM, STEM inventory status, and browser audio
+- Visible off-board potentiometer controls; P1 and P2 independently set the two physical NE555 timing networks
 - Three physical-build presets: Dual 555 Drone, TL072 Diode Fuzz, and 40106 Glitch Clock
 - Guided prediction, observation, and reflection activity
 - Keyboard focus, semantic controls, responsive layouts, and reduced-motion support
 
 ## Important modeling notes
 
-The sound is a real-time **digital behavioral simulation**. Formulas shown as calculated are circuit relationships; the waveform and spectrum are simulated browser audio. The app does not claim physical measurements or transistor-level simulation.
+The sound is a real-time **digital behavioral simulation** driven by the same component values shown in the build documents. Formulas shown as calculated are circuit relationships; the waveform and spectrum are simulated browser audio. The app does not claim physical measurements or transistor-level simulation. A physical circuit will follow the same value-to-behavior relationship, but an identical recording requires calibration for actual component tolerance, transistor gain, supply voltage, source level, and output loading.
 
 The bill of materials is a concept budget, not a construction-ready circuit. Amazon prices are not fetched automatically and can change. Verify part values, package, voltage and power ratings, pinouts, polarity, availability, and seller before buying or building.
 

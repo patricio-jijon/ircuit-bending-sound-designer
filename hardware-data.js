@@ -30,10 +30,11 @@ window.HARDWARE_PRESETS = {
     chain: ["oscillator"],
     pinouts: ["NE555P"],
     color: "#71c7ff",
-    values: { r1: 10, r2: 22, c: 10, mix: 34 },
+    values: { r1: 10, r2: 22, r2b: 33, c: 10, mix: 34 },
     controls: [
       { key: "r1", ref: "R1/R3", label: "Fixed timing resistors", unit: "kΩ", min: 1, max: 100, step: 1, audio: { module: 0, key: "r1" } },
       { key: "r2", ref: "P1", label: "Voice A pitch pot", unit: "kΩ", min: 1, max: 100, step: 1, audio: { module: 0, key: "r2" } },
+      { key: "r2b", ref: "P2", label: "Voice B pitch pot", unit: "kΩ", min: 1, max: 100, step: 1, audio: { module: 0, key: "r2b" } },
       { key: "c", ref: "C1/C3", label: "Timing capacitors", unit: "nF", min: 1, max: 100, step: 1, audio: { module: 0, key: "c" } },
       { key: "mix", ref: "P3", label: "Output level", unit: "%", min: 0, max: 100, step: 1, audio: { module: 0, key: "mix" } }
     ],
@@ -79,10 +80,10 @@ window.HARDWARE_PRESETS = {
     placements: [
       { kind: "dip8", ref: "U1", col: 10, label: "NE555P" },
       { kind: "dip8", ref: "U2", col: 20, label: "NE555P" },
-      { kind: "resistor", ref: "R1", from: "+10", to: "A11", label: "R1" },
-      { kind: "resistor", ref: "R3", from: "+20", to: "A21", label: "R3" },
-      { kind: "capacitor", ref: "C1", from: "A12", to: "-12", label: "C1" },
-      { kind: "capacitor", ref: "C3", from: "A22", to: "-22", label: "C3" },
+      { kind: "resistor", ref: "R1", from: "+10", to: "A11", label: "R1", valueKey: "r1" },
+      { kind: "resistor", ref: "R3", from: "+20", to: "A21", label: "R3", valueKey: "r1" },
+      { kind: "capacitor", ref: "C1", from: "A12", to: "-12", label: "C1", valueKey: "c" },
+      { kind: "capacitor", ref: "C3", from: "A22", to: "-22", label: "C3", valueKey: "c" },
       { kind: "capacitor", ref: "C2", from: "A13", to: "-13", label: "C2" },
       { kind: "capacitor", ref: "C4", from: "A23", to: "-23", label: "C4" },
       { kind: "resistor", ref: "R5", from: "J12", to: "J16", label: "R5" },
@@ -173,12 +174,12 @@ window.HARDWARE_PRESETS = {
       { kind: "resistor", ref: "R1", from: "+5", to: "A5", label: "100k" },
       { kind: "resistor", ref: "R2", from: "A5", to: "-5", label: "100k" },
       { kind: "electrolytic", ref: "C1", from: "B5", to: "-6", label: "10µF" },
-      { kind: "resistor", ref: "R3", from: "J7", to: "J13", label: "Rin" },
-      { kind: "resistor", ref: "R4", from: "H12", to: "H13", label: "Rf" },
-      { kind: "diode", ref: "D1", from: "G12", to: "G13", label: "1N4148" },
-      { kind: "diode", ref: "D2", from: "I13", to: "I12", label: "1N4148" },
+      { kind: "resistor", ref: "R3", from: "J7", to: "J13", label: "Rin", valueKey: "rin" },
+      { kind: "resistor", ref: "R4", from: "H12", to: "H13", label: "Rf", valueKey: "rf" },
+      { kind: "diode", ref: "D1", from: "G12", to: "G13", label: "clip", valueKey: "diode" },
+      { kind: "diode", ref: "D2", from: "I13", to: "I12", label: "clip", valueKey: "diode" },
       { kind: "resistor", ref: "R5", from: "J12", to: "J20", label: "10k" },
-      { kind: "capacitor", ref: "C4", from: "I20", to: "-20", label: "Tone" }
+      { kind: "capacitor", ref: "C4", from: "I20", to: "-20", label: "Tone", valueKey: "toneC" }
     ],
     boardWires: [["E12","+12","red"],["F15","-15","black"],["A5","A15","purple"],["E13","E14","purple"],["E13","F14","purple"],["J20","J25","green"]],
     assembly: [
@@ -206,7 +207,7 @@ window.HARDWARE_PRESETS = {
     guide: "guides/40106-glitch-clock-build-guide.pdf",
     name: "40106 Glitch Clock",
     summary: "A CD40106BE Schmitt-trigger RC oscillator producing a sharp, adjustable pulse tone.",
-    chain: ["glitch", "oscillator"],
+    chain: ["glitch"],
     pinouts: ["CD40106BE"],
     color: "#d7ff3f",
     values: { clockR: 47, clockC: 0.1, depth: 76 },
@@ -244,7 +245,7 @@ window.HARDWARE_PRESETS = {
     placements: [
       { kind: "dip14", ref: "U1", col: 10, label: "CD40106BE" },
       { kind: "resistor", ref: "R1", from: "J11", to: "J20", label: "1k" },
-      { kind: "capacitor", ref: "C1", from: "J10", to: "-10", label: "C1" },
+      { kind: "capacitor", ref: "C1", from: "J10", to: "-10", label: "C1", valueKey: "clockC" },
       { kind: "resistor", ref: "R2", from: "H11", to: "H24", label: "10k" },
       { kind: "capacitor", ref: "C3", from: "+10", to: "-16", label: "100n" }
     ],

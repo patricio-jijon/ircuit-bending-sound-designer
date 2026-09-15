@@ -19,6 +19,7 @@ const MODULES = {
     params: [
       { key: "r1", label: "Timing resistor R1", unit: "kΩ", min: 1, max: 100, step: 1, value: 10, role: "Charges the timing capacitor." },
       { key: "r2", label: "Timing resistor R2", unit: "kΩ", min: 1, max: 100, step: 1, value: 22, role: "A larger value slows charging and lowers pitch." },
+      { key: "r2b", label: "Second timer resistor R2B", unit: "kΩ", min: 1, max: 100, step: 1, value: 33, role: "Sets the independent pitch of the second NE555 voice." },
       { key: "c", label: "Timing capacitor C1", unit: "nF", min: 1, max: 100, step: 1, value: 10, role: "More capacitance stores more charge and lowers pitch." },
       { key: "mix", label: "Oscillator mix", unit: "%", min: 0, max: 100, step: 1, value: 34, role: "Sets oscillator level relative to the incoming sound." },
       { key: "voices", label: "555 timers", type: "select", value: "dual", options: [{ value: "single", label: "Single NE555" }, { value: "dual", label: "Dual NE555" }], role: "The second virtual timer runs at a related frequency for beating and intervals." }
@@ -170,6 +171,7 @@ const state = {
   modules: [],
   selectedId: null,
   audioOn: false,
+  audioStarting: false,
   source: "demo",
   prices: {},
   hardwarePreset: "dual555",
@@ -243,14 +245,15 @@ function calculateModule(instance) {
   const p = instance.params;
   if (instance.type === "oscillator") {
     const frequency = 1.44 / (((p.r1 + 2 * p.r2) * 1000) * (p.c * 1e-9));
-    const second = frequency * 1.498;
+    const second = 1.44 / (((p.r1 + 2 * p.r2b) * 1000) * (p.c * 1e-9));
     return {
       title: "Astable timing frequency",
       formula: "f ≈ 1.44 ÷ ((R1 + 2R2) × C)",
       substitution: `1.44 ÷ ((${p.r1} kΩ + 2 × ${p.r2} kΩ) × ${p.c} nF)`,
       result: `${frequency.toFixed(1)} Hz${p.voices === "dual" ? ` + ${second.toFixed(1)} Hz second voice` : ""}`,
       why: "Raising either timing resistance or capacitance increases the charge time, so pitch falls. This is a calculated NE555 astable estimate; real tolerances shift it. The audible browser model is limited to 12 kHz.",
-      frequency
+      frequency,
+      secondFrequency: second
     };
   }
   if (instance.type === "fuzz") {
@@ -581,7 +584,7 @@ function createModuleProcessor(instance) {
   const p = instance.params;
 
   if (instance.type === "oscillator") {
-    input.connect(output);
+    if (!p.hardwareOnly) input.connect(output);
     const result = calculateModule(instance);
     const frequency = clamp(result.frequency, 20, 12000);
     const toneGain = ctx.createGain();
@@ -592,7 +595,7 @@ function createModuleProcessor(instance) {
     nodes.push(toneGain, osc1);
     if (p.voices === "dual") {
       const osc2 = ctx.createOscillator();
-      osc2.type = "square"; osc2.frequency.value = frequency * 1.498; osc2.connect(toneGain); osc2.start();
+      osc2.type = "square"; osc2.frequency.value = clamp(result.secondFrequency, 20, 12000); osc2.connect(toneGain); osc2.start();
       nodes.push(osc2);
     }
   } else if (instance.type === "fuzz" || instance.type === "overdrive" || instance.type === "distortion") {
@@ -650,6 +653,16 @@ function createModuleProcessor(instance) {
     delay.connect(damping); damping.connect(feedback); feedback.connect(delay);
     nodes.push(dry, wet, delay, feedback, damping);
   } else if (instance.type === "glitch") {
+    if (p.hardwareOnly) {
+      const pulse = ctx.createOscillator();
+      const pulseGain = ctx.createGain();
+      pulse.type = "square";
+      pulse.frequency.value = clamp(calculateModule(instance).chopRate, 0.5, 12000);
+      pulseGain.gain.value = p.depth / 100 * 0.12;
+      pulse.connect(pulseGain); pulseGain.connect(output); pulse.start();
+      nodes.push(pulse, pulseGain);
+      return { input, output, nodes };
+    }
     const dry = ctx.createGain();
     const wet = ctx.createGain();
     const shaper = ctx.createWaveShaper();
@@ -697,6 +710,8 @@ function rebuildAudioGraph() {
 }
 
 async function toggleAudio() {
+  if (state.audioStarting) return;
+  state.audioStarting = true;
   try {
     await ensureAudio();
     state.audioOn = !state.audioOn;
@@ -712,6 +727,8 @@ async function toggleAudio() {
     syncAudioButtons();
   } catch (error) {
     announce(error.message || "Audio could not start in this browser.");
+  } finally {
+    state.audioStarting = false;
   }
 }
 
@@ -912,7 +929,8 @@ function hardwareCalculation(preset) {
   const v = preset.values;
   if (preset.id === "dual555") {
     const f = 1.44 / (((v.r1 + 2 * v.r2) * 1000) * (v.c * 1e-9));
-    return `<span>Calculated timing</span><strong>${f.toFixed(1)} Hz</strong><code>f ≈ 1.44 / ((${v.r1} kΩ + 2×${v.r2} kΩ) × ${v.c} nF)</code><p>Component tolerance means a physical frequency will differ.</p>`;
+    const f2 = 1.44 / (((v.r1 + 2 * v.r2b) * 1000) * (v.c * 1e-9));
+    return `<span>Calculated NE555 timing</span><strong>Voice A ${f.toFixed(1)} Hz · Voice B ${f2.toFixed(1)} Hz</strong><code>fA ≈ 1.44 / ((${v.r1} kΩ + 2×${v.r2} kΩ) × ${v.c} nF)<br>fB ≈ 1.44 / ((${v.r1} kΩ + 2×${v.r2b} kΩ) × ${v.c} nF)</code><p>The Web Audio oscillators use these calculated frequencies. Physical component tolerance shifts measured pitch.</p>`;
   }
   if (preset.id === "opampFuzz") {
     const gain = v.rf / v.rin;
@@ -941,6 +959,107 @@ function renderIllustratedBom() {
   $("#hardware-missing-cost").textContent = `$${missingTotal.toFixed(2)}`;
 }
 
+function hardwareValueLabel(control, value) {
+  const option = control.options?.find((item) => item.value === value);
+  if (option) return option.label;
+  if (control.unit === "%") return `${Number(value)}% of potentiometer travel`;
+  return `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${control.unit || ""}`.trim();
+}
+
+function choiceAvailability(control, value, current) {
+  if (String(value) === String(current)) return "Currently installed";
+  if (control.key === "diode") return value === "schottky" ? "STEM stock · 1N5817" : "Additional part";
+  if (control.key === "transistor") return "Additional part · verify E-B-C pins";
+  if (control.unit === "%") return "Set the physical knob to this position";
+  if (control.unit === "kΩ") {
+    if (Number(value) === 1) return "STEM stock · 1 kΩ";
+    if ([4.7, 47].includes(Number(value))) return "STEM list · quantity/rating check";
+    return "STEM resistor assortment · verify";
+  }
+  return "Additional film capacitor value";
+}
+
+function engineeringChoices(control) {
+  if (control.options) return control.options;
+  const sets = {
+    "kΩ": [1, 2.2, 4.7, 10, 22, 47, 68, 100, 220, 470, 500, 680, 1000],
+    "nF": [1, 2.2, 4.7, 10, 22, 47, 68, 100, 150, 220],
+    "µF": [0.01, 0.022, 0.047, 0.1, 0.22, 0.47, 1],
+    "%": [0, 10, 25, 50, 75, 90, 100]
+  };
+  const values = (sets[control.unit] || [control.min, control.max]).filter((value) => value >= control.min && value <= control.max);
+  if (!values.includes(Number(control.min))) values.unshift(Number(control.min));
+  if (!values.includes(Number(control.max))) values.push(Number(control.max));
+  return [...new Set(values)].map((value) => ({ value: String(value), label: hardwareValueLabel(control, value) }));
+}
+
+function interactiveSvgGroup(part, inner) {
+  if (!part.valueKey) return inner;
+  return `<g class="interactive-component" data-component-key="${part.valueKey}" data-component-ref="${part.ref}" role="button" tabindex="0" aria-label="Change ${part.ref}. Right-click or press Enter."><title>${part.ref}: right-click to change this component</title>${inner}</g>`;
+}
+
+function renderPotControls(preset) {
+  const controls = preset.controls.filter((control) => /^P\d/.test(control.ref));
+  if (!controls.length) return "";
+  return `<div class="offboard-controls" aria-label="Interactive off-board potentiometers"><div><span>Off-board controls</span><strong>Right-click a knob to set it and hear the result</strong></div>${controls.map((control) => {
+    const value = preset.values[control.key];
+    const turn = control.unit === "%" ? Number(value) : ((Number(value) - control.min) / (control.max - control.min)) * 100;
+    const degrees = -135 + Math.max(0, Math.min(100, turn)) * 2.7;
+    return `<button type="button" class="interactive-component physical-pot" data-component-key="${control.key}" data-component-ref="${control.ref}" aria-label="${control.ref} ${control.label}, ${hardwareValueLabel(control, value)}. Right-click or press Enter to change."><span class="physical-knob" style="--pot-turn:${degrees}deg" aria-hidden="true"><i></i></span><span><b>${control.ref}</b><strong>${control.label}</strong><small>${hardwareValueLabel(control, value)}</small></span></button>`;
+  }).join("")}</div>`;
+}
+
+function schematicHotspots(preset) {
+  const maps = {
+    dual555: [["R1", "r1", 55, 155, 125, 48], ["P1", "r2", 55, 204, 130, 48], ["C1", "c", 350, 345, 105, 58], ["R3", "r1", 480, 155, 125, 48], ["P2", "r2b", 480, 204, 135, 48], ["C3", "c", 775, 345, 105, 58], ["P3", "mix", 675, 392, 235, 48]],
+    opampFuzz: [["R3", "rin", 245, 365, 120, 65], ["R4", "rf", 335, 245, 110, 65], ["D1/D2", "diode", 335, 300, 125, 55], ["C4", "toneC", 660, 397, 100, 65], ["P1", "level", 748, 345, 185, 55]],
+    glitchClock: [["P1", "clockR", 365, 115, 210, 70], ["C1", "clockC", 45, 320, 125, 90], ["P2", "depth", 670, 215, 240, 70]]
+  };
+  return maps[preset.id].map(([ref,key,x,y,width,height]) => `<g class="interactive-component" data-component-key="${key}" data-component-ref="${ref}" role="button" tabindex="0" aria-label="Change ${ref}. Right-click or press Enter."><title>${ref}: right-click to choose a real component value</title><rect class="component-hitbox" x="${x}" y="${y}" width="${width}" height="${height}" rx="5"/></g>`).join("");
+}
+
+function closeComponentMenu() {
+  const menu = $("#component-menu");
+  menu.hidden = true;
+  menu.innerHTML = "";
+}
+
+function openComponentMenu(target, clientX, clientY) {
+  const preset = hardwarePreset();
+  const control = preset.controls.find((item) => item.key === target.dataset.componentKey);
+  if (!control) return;
+  const menu = $("#component-menu");
+  const current = preset.values[control.key];
+  const choices = engineeringChoices(control);
+  menu.innerHTML = `<div class="component-menu-heading"><span>${target.dataset.componentRef}</span><strong>${control.label}</strong><small>Current: ${hardwareValueLabel(control, current)}</small></div><div class="component-menu-options">${choices.map((option) => `<button type="button" role="menuitemradio" aria-checked="${String(String(option.value) === String(current))}" data-component-choice="${option.value}"><span>${option.label}</span><small>${choiceAvailability(control, option.value, current)}</small></button>`).join("")}</div><p>Browser audio is a calculated behavioral target. Disconnect physical power before replacing a part.</p>`;
+  menu.hidden = false;
+  menu.dataset.componentKey = control.key;
+  const width = 300;
+  const height = Math.min(430, menu.scrollHeight || 430);
+  menu.style.left = `${Math.max(8, Math.min(clientX, window.innerWidth - width - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(clientY, window.innerHeight - height - 8))}px`;
+  menu.querySelector("button")?.focus();
+}
+
+async function applyHardwareChoice(key, rawValue) {
+  const preset = hardwarePreset();
+  const control = preset.controls.find((item) => item.key === key);
+  if (!control) return;
+  const value = control.type === "select" ? rawValue : Number(rawValue);
+  preset.values[key] = value;
+  const module = state.modules[control.audio.module];
+  if (module) module.params[control.audio.key] = value;
+  renderHardwareControls();
+  renderIllustratedBom();
+  renderConstruction();
+  rebuildAudioGraph();
+  renderChain();
+  renderInspector();
+  closeComponentMenu();
+  if (!state.audioOn) await toggleAudio();
+  announce(`${control.ref} changed to ${hardwareValueLabel(control, value)}. Sound model updated.`);
+}
+
 function schematicSvg(preset) {
   const v = preset.values;
   const header = `<svg class="technical-svg" viewBox="0 0 980 520" role="img" aria-label="${preset.name} labeled construction schematic"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z" fill="currentColor"/></marker></defs><rect width="980" height="520" fill="#f7f8f3"/><text x="34" y="42" class="svg-title">${preset.name}</text><text x="34" y="66" class="svg-note">9 V DC · TOP VIEW PIN REFERENCES · NOT PHYSICALLY TESTED</text>`;
@@ -950,8 +1069,8 @@ function schematicSvg(preset) {
     <g transform="translate(610 145)"><rect class="ic-body" width="190" height="185"/><path d="M80 0q15 20 30 0" class="symbol"/><text x="95" y="90" text-anchor="middle" class="ic-name">U2 NE555P</text><text x="12" y="25">8 VCC</text><text x="12" y="165">1 GND</text><text x="125" y="25">4 RESET</text><text x="112" y="165">3 OUT</text><text x="12" y="58">7 DISCH</text><text x="12" y="126">2 TRIG</text><text x="116" y="126">6 THRES</text><text x="116" y="58">5 CONT</text></g>
     <path class="wire" d="M220 145V100m120 45v-45M645 145v-45m120 45v-45M220 330v125M645 330v125"/>
     <path class="wire blue" d="M197 203H130v70h67m166 0h70v88H320m302-158h-67v70h67m166 0h70v88H745"/>
-    <g class="component-label"><text x="78" y="188">R1 ${v.r1} kΩ</text><text x="76" y="226">P1 ${v.r2} kΩ</text><text x="370" y="382">C1 ${v.c} nF</text><text x="502" y="188">R3 ${v.r1} kΩ</text><text x="500" y="226">P2 100 kΩ</text><text x="796" y="382">C3 ${v.c} nF</text></g>
-    <path class="wire signal" d="M297 310v75h125m266-75v75H562m-140 0h140"/><rect x="454" y="365" width="76" height="40" class="component-box"/><text x="492" y="390" text-anchor="middle">MIX R5/R6</text><path class="wire signal" d="M530 385h145v45h160"/><text x="700" y="420">P3 ${v.mix}% → C5 → OUTPUT</text></svg>`;
+    <g class="component-label"><text x="78" y="188">R1 ${v.r1} kΩ</text><text x="76" y="226">P1 ${v.r2} kΩ</text><text x="370" y="382">C1 ${v.c} nF</text><text x="502" y="188">R3 ${v.r1} kΩ</text><text x="500" y="226">P2 ${v.r2b} kΩ</text><text x="796" y="382">C3 ${v.c} nF</text></g>
+    <path class="wire signal" d="M297 310v75h125m266-75v75H562m-140 0h140"/><rect x="454" y="365" width="76" height="40" class="component-box"/><text x="492" y="390" text-anchor="middle">MIX R5/R6</text><path class="wire signal" d="M530 385h145v45h160"/><text x="700" y="420">P3 ${v.mix}% → C5 → OUTPUT</text>${schematicHotspots(preset)}</svg>`;
   if (preset.id === "opampFuzz") return `${header}
     <path class="rail plus" d="M50 95H930"/><text x="55" y="86">+9 V</text><path class="rail ground" d="M50 460H930"/><text x="55" y="483">GND</text>
     <path class="wire" d="M120 95v75m0 70v70m0 70v80"/><path class="resistor-symbol" d="M120 170l-10 7 20 12-20 12 20 12-10 7"/><path class="resistor-symbol" d="M120 310l-10 7 20 12-20 12 20 12-10 7"/><text x="138" y="198">R1 100 kΩ</text><text x="138" y="338">R2 100 kΩ</text><circle cx="120" cy="270" r="5"/><text x="140" y="276">VBIAS ≈ 4.5 V</text>
@@ -959,12 +1078,12 @@ function schematicSvg(preset) {
     <path class="wire signal" d="M40 385h90"/><text x="42" y="375">INPUT</text><rect x="130" y="365" width="62" height="38" class="component-box"/><text x="161" y="389" text-anchor="middle">C2</text><path class="wire signal" d="M192 385h62"/><path class="resistor-symbol" d="M254 385l8-10 12 20 12-20 12 20 12-10h50"/><text x="260" y="420">R3 ${v.rin} kΩ</text>
     <path class="opamp" d="M360 335v100l110-50z"/><text x="376" y="365">− 2</text><text x="376" y="415">+ 3</text><text x="413" y="389">U1A</text><path class="wire purple" d="M360 410H280V270"/><path class="wire signal" d="M470 385h92"/>
     <path class="wire orange" d="M455 355v-72H330v72"/><path class="resistor-symbol" d="M355 283l8-10 12 20 12-20 12 20 12-10"/><text x="348" y="261">R4 ${v.rf} kΩ</text><path class="wire yellow" d="M350 320h84"/><path class="diode-symbol" d="M370 310v20l22-10zm22-10v40m20-30v20l-22-10zm-22-10v40"/><text x="350" y="345">D1/D2 ${v.diode} antiparallel</text>
-    <rect x="562" y="365" width="95" height="40" class="component-box"/><text x="609" y="389" text-anchor="middle">R5 10 kΩ</text><path class="wire signal" d="M657 385h78"/><path class="wire" d="M705 385v75"/><text x="674" y="440">C4 ${v.toneC} nF</text><path class="wire signal" d="M735 385h195"/><text x="755" y="374">P1 ${v.level}% → C3 → OUTPUT</text></svg>`;
+    <rect x="562" y="365" width="95" height="40" class="component-box"/><text x="609" y="389" text-anchor="middle">R5 10 kΩ</text><path class="wire signal" d="M657 385h78"/><path class="wire" d="M705 385v75"/><text x="674" y="440">C4 ${v.toneC} nF</text><path class="wire signal" d="M735 385h195"/><text x="755" y="374">P1 ${v.level}% → C3 → OUTPUT</text>${schematicHotspots(preset)}</svg>`;
   return `${header}
     <path class="rail plus" d="M60 95H920"/><text x="65" y="86">+9 V</text><path class="rail ground" d="M60 445H920"/><text x="65" y="470">GND</text>
     <rect x="165" y="150" width="250" height="205" class="ic-body"/><text x="290" y="185" text-anchor="middle" class="ic-name">U1 CD40106BE · PDIP-14</text><path class="inverter" d="M240 225v80l95-40z"/><circle cx="346" cy="265" r="11" class="symbol"/><text x="205" y="270">1 A</text><text x="355" y="270">2 /A</text><text x="180" y="330">14 VDD → +9 V · 7 VSS → GND</text>
     <path class="wire blue" d="M357 265h145v-105H210v65"/><path class="resistor-symbol" d="M410 160l8-10 12 20 12-20 12 20 12-10"/><text x="382" y="138">R1 1 kΩ + P1 ${v.clockR} kΩ</text><path class="wire" d="M210 265H110v180"/><path d="M90 355h40m-40 14h40" class="symbol"/><text x="62" y="342">C1</text><text x="54" y="390">${v.clockC} µF</text>
-    <path class="wire signal" d="M357 265h205"/><path class="resistor-symbol" d="M500 265l8-10 12 20 12-20 12 20 12-10"/><rect x="562" y="245" width="70" height="40" class="component-box"/><text x="597" y="270" text-anchor="middle">C2 1 µF</text><path class="wire signal" d="M632 265h270"/><text x="682" y="249">P2 ${v.depth}% → OUTPUT</text><text x="515" y="330">Unused inputs 3, 5, 9, 11, 13 → GND</text></svg>`;
+    <path class="wire signal" d="M357 265h205"/><path class="resistor-symbol" d="M500 265l8-10 12 20 12-20 12 20 12-10"/><rect x="562" y="245" width="70" height="40" class="component-box"/><text x="597" y="270" text-anchor="middle">C2 1 µF</text><path class="wire signal" d="M632 265h270"/><text x="682" y="249">P2 ${v.depth}% → OUTPUT</text><text x="515" y="330">Unused inputs 3, 5, 9, 11, 13 → GND</text>${schematicHotspots(preset)}</svg>`;
 }
 
 function holePoint(hole) {
@@ -994,9 +1113,10 @@ function breadboardSvg(preset) {
       return `<g><rect x="${x}" y="218" width="${width}" height="38" class="board-ic"/><path d="M${x} 229q13 8 0 16" class="symbol"/><text x="${x+width/2}" y="244" text-anchor="middle" class="board-label">${part.ref} ${part.label}</text>${pinLabels}</g>`;
     }
     const a=holePoint(part.from), b=holePoint(part.to), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-    if (part.kind === "resistor") return `<g><path d="M${a.x} ${a.y}L${mx-22} ${my}m44 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-22}" y="${my-8}" width="44" height="16" rx="6" class="board-resistor"/><text x="${mx}" y="${my-12}" text-anchor="middle" class="board-label">${part.ref} ${part.label}</text></g>`;
-    if (part.kind === "diode") return `<g><path d="M${a.x} ${a.y}L${mx-20} ${my}m40 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-20}" y="${my-7}" width="40" height="14" class="board-diode"/><path d="M${mx+12} ${my-7}v14" class="diode-band"/><text x="${mx}" y="${my-12}" text-anchor="middle" class="board-label">${part.ref}</text></g>`;
-    return `<g><path d="M${a.x} ${a.y}L${mx-8} ${my}m16 0L${b.x} ${b.y}" class="part-lead"/><path d="M${mx-8} ${my-13}v26m16-26v26" class="board-cap"/><text x="${mx}" y="${my-17}" text-anchor="middle" class="board-label">${part.ref} ${part.label}</text></g>`;
+    const value = part.valueKey ? hardwareValueLabel(preset.controls.find((item) => item.key === part.valueKey), preset.values[part.valueKey]) : part.label;
+    if (part.kind === "resistor") return interactiveSvgGroup(part, `<g><path d="M${a.x} ${a.y}L${mx-22} ${my}m44 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-22}" y="${my-8}" width="44" height="16" rx="6" class="board-resistor"/><text x="${mx}" y="${my-12}" text-anchor="middle" class="board-label">${part.ref} ${value}</text></g>`);
+    if (part.kind === "diode") return interactiveSvgGroup(part, `<g><path d="M${a.x} ${a.y}L${mx-20} ${my}m40 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-20}" y="${my-7}" width="40" height="14" class="board-diode"/><path d="M${mx+12} ${my-7}v14" class="diode-band"/><text x="${mx}" y="${my-12}" text-anchor="middle" class="board-label">${part.ref} ${value}</text></g>`);
+    return interactiveSvgGroup(part, `<g><path d="M${a.x} ${a.y}L${mx-8} ${my}m16 0L${b.x} ${b.y}" class="part-lead"/><path d="M${mx-8} ${my-13}v26m16-26v26" class="board-cap"/><text x="${mx}" y="${my-17}" text-anchor="middle" class="board-label">${part.ref} ${value}</text></g>`);
   }).join("");
   return `<svg class="technical-svg breadboard-svg" viewBox="0 0 790 410" role="img" aria-label="${preset.name} breadboard placement, top view"><rect x="4" y="20" width="780" height="370" rx="8" class="breadboard-body"/><path d="M35 232H765" class="board-trench"/><path d="M35 57H765M35 82H765" class="board-rail"/><text x="20" y="61" class="plus-text">+</text><text x="20" y="86" class="minus-text">−</text>${letters}${holes}${wires}${parts}<text x="395" y="382" text-anchor="middle" class="svg-note">TOP VIEW · BB830-STYLE · VERIFY RAIL CONTINUITY · CONNECTION TABLE IS AUTHORITATIVE</text></svg>`;
 }
@@ -1009,8 +1129,8 @@ function renderConstruction() {
     return `<section class="pinout-section"><h3>${item.identity}</h3><p>${item.orientation}</p><div class="connection-table-wrap"><table class="connection-table pinout-table"><thead><tr><th>Pin</th><th>Name</th><th>Role in this component</th></tr></thead><tbody>${item.pins.map(([number,name,role])=>`<tr><td>${number}</td><td><strong>${name}</strong></td><td>${role}</td></tr>`).join("")}</tbody></table></div><a href="${item.source}" target="_blank" rel="noopener noreferrer">Open manufacturer source ↗</a></section>`;
   }).join("");
   panel.innerHTML = `
-    <section id="construction-schematic" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">1 · Construction schematic</p><h2>${preset.name}</h2></div><span>Calculated / not physically tested</span></div>${schematicSvg(preset)}<p class="graphic-caption">Reference designators and values match the parts tray and update when you move a component control.</p></section>
-    <section id="construction-breadboard" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">2 · Breadboard illustration</p><h2>Place the parts</h2></div><span>Top view · power disconnected</span></div>${breadboardSvg(preset)}<p class="graphic-caption">Colored paths show jumpers; component leads terminate at named holes. Off-board controls and jacks are listed below.</p></section>
+    <section id="construction-schematic" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">1 · Interactive construction schematic</p><h2>${preset.name}</h2></div><span>Hover a blue target · right-click to change a part</span></div>${schematicSvg(preset)}<p class="graphic-caption"><strong>Interactive:</strong> right-click highlighted resistors, capacitors, diodes, and potentiometers to install an engineering value and hear the recalculated sound.</p></section>
+    <section id="construction-breadboard" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">2 · Interactive breadboard illustration</p><h2>Place the parts</h2></div><span>Top view · power disconnected</span></div>${breadboardSvg(preset)}${renderPotControls(preset)}<p class="graphic-caption"><strong>Interactive:</strong> hover and right-click labeled parts or physical knobs. Colored paths show jumpers; jacks are listed below.</p></section>
     <section id="construction-connections" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">3 · Wire-by-wire table</p><h2>Make every connection</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${row[0]}</strong></td><td>${row.slice(1,-2).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${row.at(-1)}</td></tr>`).join("")}</tbody></table></div></section>
     <section id="construction-pinouts" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">4 · Manufacturer-verified pinouts</p><h2>Orient each IC</h2></div><span>Top view · confirm notch before power</span></div>${pinouts}</section>
     <section id="construction-assembly" class="construction-section"><div class="graphic-heading"><div><p class="evidence-label">5 · Step-by-step assembly</p><h2>Build with power disconnected</h2></div><span>Complete one step at a time</span></div><ol class="assembly-list">${preset.assembly.map((step,index)=>`<li><span>${String(index+1).padStart(2,"0")}</span><p>${step}</p></li>`).join("")}</ol></section>`;
@@ -1037,6 +1157,7 @@ function loadHardwareSound() {
     if (module) module.params[control.audio.key] = preset.values[control.key];
   });
   if (preset.id === "dual555") state.modules[0].params.voices = "dual";
+  if (preset.id === "dual555" || preset.id === "glitchClock") state.modules[0].params.hardwareOnly = true;
   state.selectedId = state.modules[0]?.id ?? null;
   state.hardwareLoadedId = preset.id;
   renderStudio();
@@ -1142,12 +1263,35 @@ function bindEvents() {
     renderIllustratedBom();
     $(".hardware-calculation").innerHTML = hardwareCalculation(preset);
     renderConstruction();
+    if (!state.audioOn) toggleAudio();
   });
   $(".construction-tabs").addEventListener("click", (event) => {
     const button = event.target.closest("[data-construction]");
     if (!button) return;
     $(`#construction-${button.dataset.construction}`).scrollIntoView({ behavior: "smooth", block: "start" });
   });
+  $("#construction-panel").addEventListener("contextmenu", (event) => {
+    const component = event.target.closest(".interactive-component");
+    if (!component) return;
+    event.preventDefault();
+    openComponentMenu(component, event.clientX, event.clientY);
+  });
+  $("#construction-panel").addEventListener("keydown", (event) => {
+    const component = event.target.closest(".interactive-component");
+    if (!component || !["Enter", " ", "ContextMenu"].includes(event.key)) return;
+    event.preventDefault();
+    const rect = component.getBoundingClientRect();
+    openComponentMenu(component, rect.left + Math.min(rect.width, 30), rect.top + Math.min(rect.height, 30));
+  });
+  $("#component-menu").addEventListener("click", (event) => {
+    const choice = event.target.closest("[data-component-choice]");
+    if (!choice) return;
+    applyHardwareChoice(event.currentTarget.dataset.componentKey, choice.dataset.componentChoice);
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!event.target.closest("#component-menu") && !event.target.closest(".interactive-component")) closeComponentMenu();
+  });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeComponentMenu(); });
   $("#experiment-form").addEventListener("submit", (event) => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
