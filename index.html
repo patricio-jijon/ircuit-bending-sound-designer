@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=6">
-  <script src="hardware-data.js?v=6" defer></script>
-  <script src="app.js?v=6" defer></script>
+  <link rel="stylesheet" href="styles.css?v=7">
+  <script src="hardware-data.js?v=7" defer></script>
+  <script src="app.js?v=7" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -168,49 +168,48 @@
 
     <section id="hardware" class="view hardware-view is-active" aria-labelledby="hardware-title">
       <div class="hardware-toolbar">
-        <div>
-          <span class="section-number">Build-ready presets</span>
-          <h1 id="hardware-title">From sound to breadboard</h1>
+        <div class="hardware-title-block"><span class="section-number">Physical computing workspace</span><h1 id="hardware-title">Circuit Builder</h1></div>
+        <label class="preset-field" for="hardware-preset"><span>Verified circuit</span><select id="hardware-preset"></select></label>
+        <div class="workbench-tools" aria-label="Workspace tools">
+          <button id="hardware-undo" class="tool-button" type="button" title="Undo component change" aria-label="Undo component change" disabled>↶</button>
+          <button id="hardware-redo" class="tool-button" type="button" title="Redo component change" aria-label="Redo component change" disabled>↷</button>
+          <label class="zoom-control" for="workspace-zoom"><span>Zoom</span><input id="workspace-zoom" type="range" min="75" max="140" step="5" value="100"><output id="workspace-zoom-value">100%</output></label>
         </div>
-        <div class="preset-picker">
-          <label for="hardware-preset">Circuit preset</label>
-          <select id="hardware-preset"></select>
-          <label class="sr-only" for="hardware-source-select">Sound source</label>
-          <select id="hardware-source-select" aria-label="Sound source">
-            <option value="demo">Built-in riff</option>
-            <option value="tone">Test tone</option>
-            <option value="microphone">Microphone / guitar interface</option>
-          </select>
-          <button id="load-hardware-sound" type="button">Reload preset sound</button>
-          <button id="hardware-audio-toggle" class="hardware-audio-toggle" type="button" aria-pressed="false">Start sound</button>
-          <a id="download-guide" class="download-guide" href="guides/dual-555-drone-build-guide.pdf" download>Download PDF guide</a>
+        <div class="simulation-tools">
+          <label class="sr-only" for="hardware-source-select">Simulation sound source</label>
+          <select id="hardware-source-select" aria-label="Simulation sound source"><option value="demo">Built-in riff</option><option value="tone">Test tone</option><option value="microphone">Microphone / guitar interface</option></select>
+          <button id="load-hardware-sound" class="secondary-button" type="button">Reset preset</button>
+          <button id="hardware-audio-toggle" class="hardware-audio-toggle" type="button" aria-pressed="false">Start simulation</button>
+          <a id="download-guide" class="download-guide" href="guides/dual-555-drone-build-guide.pdf" download>Build guide</a>
         </div>
       </div>
       <div class="hardware-status">
         <span class="status-dot" aria-hidden="true"></span>
-        <strong>Datasheet-verified pinouts</strong>
-        <span id="hardware-audio-status">Sound model connected · press Start sound</span>
+        <strong id="hardware-selection-status">Verified preset ready</strong>
+        <span id="hardware-audio-status">Behavioral sound model stopped</span>
         <span>9 V DC · calculated + browser-simulated · not physically tested</span>
       </div>
       <div class="hardware-layout">
         <aside class="parts-drawer" aria-labelledby="parts-drawer-title">
-          <div class="panel-heading"><div><span class="section-number">A</span><h2 id="parts-drawer-title">Change parts and listen</h2></div><p>Press Start sound, then move a resistor, capacitor, or knob. Values update the audio, drawing, and parts list immediately.</p></div>
-          <div id="hardware-controls" class="hardware-controls"></div>
+          <div class="workbench-panel-heading"><div><span class="section-number">Parts</span><h2 id="parts-drawer-title">Build components</h2></div><p>Select a part to inspect its identity, value, and role.</p></div>
+          <label class="parts-search" for="parts-search"><span class="sr-only">Search components</span><input id="parts-search" type="search" placeholder="Search parts or references" autocomplete="off"></label>
+          <div id="illustrated-components" class="illustrated-components"></div>
+          <div class="hardware-total"><div><span>Project</span><strong id="hardware-cost">$0.00</strong></div><div><span>To purchase</span><strong id="hardware-missing-cost">$0.00</strong></div></div>
         </aside>
         <div class="construction-workspace">
-          <div class="construction-tabs" aria-label="Jump to construction section">
-            <button type="button" data-construction="schematic">Schematic</button>
-            <button type="button" data-construction="breadboard">Breadboard</button>
-            <button type="button" data-construction="connections">Connections</button>
-            <button type="button" data-construction="pinouts">Pinouts</button>
-            <button type="button" data-construction="assembly">Assembly</button>
+          <div class="construction-tabs" role="tablist" aria-label="Workspace view">
+            <button class="is-active" type="button" role="tab" aria-selected="true" data-construction="breadboard">Breadboard</button>
+            <button type="button" role="tab" aria-selected="false" data-construction="schematic">Schematic</button>
+            <button type="button" role="tab" aria-selected="false" data-construction="connections">Connections</button>
+            <button type="button" role="tab" aria-selected="false" data-construction="pinouts">Pinouts</button>
+            <button type="button" role="tab" aria-selected="false" data-construction="assembly">Assembly</button>
           </div>
-          <section id="construction-panel" class="construction-panel" aria-live="polite"></section>
+          <section id="construction-panel" class="construction-panel" aria-live="polite" style="--workspace-zoom:1"></section>
+          <div class="canvas-footer"><span>Top view · power disconnected while editing</span><span>Connection table remains authoritative</span></div>
         </div>
-        <aside class="illustrated-bom" aria-labelledby="illustrated-bom-title">
-          <div class="panel-heading"><div><span class="section-number">B</span><h2 id="illustrated-bom-title">Parts tray</h2></div><p>One complete preset build.</p></div>
-          <div id="illustrated-components" class="illustrated-components"></div>
-          <div class="hardware-total"><div><span>Full project estimate</span><strong id="hardware-cost">$0.00</strong></div><div><span>Additional purchases</span><strong id="hardware-missing-cost">$0.00</strong></div></div>
+        <aside class="component-inspector" aria-labelledby="component-inspector-title">
+          <div class="workbench-panel-heading"><div><span class="section-number">Inspector</span><h2 id="component-inspector-title">Selected component</h2></div><p>Values update the diagram, calculations, BOM, and behavioral sound model.</p></div>
+          <div id="hardware-controls" class="hardware-controls"></div>
         </aside>
       </div>
       <section class="hardware-notes" aria-labelledby="hardware-notes-title">
