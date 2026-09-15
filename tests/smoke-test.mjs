@@ -5,16 +5,21 @@ import { dirname, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
-const [html, css, js, hardware, readme] = await Promise.all([
+const [html, css, js, hardware, devices, readme] = await Promise.all([
   readFile(resolve(root, "index.html"), "utf8"),
   readFile(resolve(root, "styles.css"), "utf8"),
   readFile(resolve(root, "app.js"), "utf8"),
   readFile(resolve(root, "hardware-data.js"), "utf8"),
+  readFile(resolve(root, "devices-data.js"), "utf8"),
   readFile(resolve(root, "README.md"), "utf8")
 ]);
 
 assert.match(html, /<title>Circuit Bending Sound Designer<\/title>/);
-assert.match(html, /app\.js\?v=7/);
+assert.match(html, /app\.js\?v=8/);
+assert.match(html, /id="devices" class="view devices-view"/);
+assert.match(html, /id="planner-controller"/);
+assert.match(html, /id="device-catalog"/);
+assert.match(html, /id="compatibility-report"/);
 assert.match(html, /id="audio-toggle"/);
 assert.match(html, /id="signal-chain"/);
 assert.match(html, /id="bom-body"/);
@@ -49,6 +54,9 @@ assert.match(js, /function inventoryMatch/);
 assert.match(js, /function openComponentMenu/);
 assert.match(js, /function selectHardwarePart/);
 assert.match(js, /function undoHardwareChange/);
+assert.match(js, /function renderDevicePlanner/);
+assert.match(js, /function deviceChecks/);
+assert.match(js, /function suggestedDeviceConnection/);
 assert.match(js, /state\.constructionView = button\.dataset\.construction/);
 assert.match(js, /contextmenu/);
 assert.match(js, /addEventListener\("click", openComponentMenuFromClick\)/);
@@ -64,9 +72,13 @@ for (const preset of ["dual555", "opampFuzz", "glitchClock"]) {
 }
 assert.match(hardware, /pin 8 · E10/);
 assert.match(hardware, /pin 14 · E10/);
+assert.match(devices, /Arduino UNO R4 WiFi/);
+assert.match(devices, /Raspberry Pi 5/);
+assert.match(devices, /Teensy 4\.1/);
 assert.match(css, /prefers-reduced-motion/);
 assert.match(css, /Physical computing workspace/);
 assert.match(css, /grid-template-columns: 248px minmax\(520px, 1fr\) 310px/);
+assert.match(css, /Device compatibility planner/);
 assert.match(readme, /GitHub Pages/);
 
 console.log("Static smoke tests passed: structure, modules, accessibility hooks, audio limiter, purchasing, and STL export.");
