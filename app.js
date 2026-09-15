@@ -170,7 +170,10 @@ const state = {
   selectedId: null,
   audioOn: false,
   source: "demo",
-  prices: {}
+  prices: {},
+  hardwarePreset: "dual555",
+  hardwareLoadedId: null,
+  constructionView: "schematic"
 };
 
 let audio = {
@@ -839,10 +842,177 @@ function loadPreset() {
   announce("Grit preset loaded: dual oscillator, double fuzz, octave, distortion, and delay.");
 }
 
+function hardwarePreset() {
+  return window.HARDWARE_PRESETS[state.hardwarePreset];
+}
+
+function componentValue(component, preset) {
+  if (component.valueKey) return `${preset.values[component.valueKey]}${component.suffix || ""}`;
+  return component.value;
+}
+
+function componentIcon(kind) {
+  const common = 'viewBox="0 0 82 50" aria-hidden="true"';
+  if (kind === "resistor") return `<svg ${common}><path d="M4 25h14l5-9 8 18 8-18 8 18 8-18 5 9h18"/><text x="41" y="47">R</text></svg>`;
+  if (kind === "capacitor") return `<svg ${common}><path d="M5 25h28m0-14v28m16-28v28m0-14h28"/><text x="41" y="47">C</text></svg>`;
+  if (kind === "electrolytic") return `<svg ${common}><path d="M5 25h28m0-14v28m16-28v28m0-14h28"/><text x="25" y="10">+</text><text x="41" y="47">C</text></svg>`;
+  if (kind === "diode") return `<svg ${common}><path d="M5 25h25m22 0h25M30 11v28l22-14zM52 11v28"/><text x="41" y="47">D</text></svg>`;
+  if (kind === "pot") return `<svg ${common}><path d="M5 28h14l5-8 7 16 7-16 7 16 7-16 5 8h20M62 5 43 20m19-15-2 9m2-9-9 1"/><text x="18" y="48">POT</text></svg>`;
+  if (kind === "jack") return `<svg ${common}><circle cx="41" cy="25" r="17"/><circle cx="41" cy="25" r="7"/><path d="M58 25h19"/><text x="5" y="47">JACK</text></svg>`;
+  if (kind === "supply") return `<svg ${common}><path d="M6 25h20m4-14v28m11-20v12m4-6h31"/><text x="49" y="47">9 V</text></svg>`;
+  if (kind === "breadboard") return `<svg ${common}><rect x="4" y="6" width="74" height="37" rx="2"/><path d="M8 14h66M8 35h66M39 17v15m4-15v15" stroke-dasharray="2 2"/><text x="23" y="29">BB830</text></svg>`;
+  const pins = kind === "dip14" ? 7 : 4;
+  return `<svg ${common}><rect x="19" y="8" width="44" height="34" rx="2"/><path d="M35 8q6 8 12 0"/>${Array.from({length:pins},(_,i)=>`<path d="M${23+i*(36/(pins-1))} 3v5m0 34v5"/>`).join("")}<text x="41" y="29" text-anchor="middle">IC</text></svg>`;
+}
+
+function renderHardwareSelector() {
+  const select = $("#hardware-preset");
+  select.innerHTML = Object.values(window.HARDWARE_PRESETS).map((preset) => `<option value="${preset.id}"${preset.id === state.hardwarePreset ? " selected" : ""}>${preset.name}</option>`).join("");
+  $("#download-guide").href = hardwarePreset().guide;
+}
+
+function renderHardwareControls() {
+  const preset = hardwarePreset();
+  $("#hardware-controls").innerHTML = `<p class="hardware-summary">${preset.summary}</p>${preset.controls.map((control) => `
+    <div class="hardware-control">
+      <div><label for="hardware-${control.key}"><span>${control.ref}</span>${control.label}</label><output id="hardware-value-${control.key}">${preset.values[control.key]} ${control.unit}</output></div>
+      <input id="hardware-${control.key}" type="range" min="${control.min}" max="${control.max}" step="${control.step}" value="${preset.values[control.key]}" data-hardware-key="${control.key}">
+    </div>`).join("")}
+    <div class="hardware-calculation">${hardwareCalculation(preset)}</div>`;
+}
+
+function hardwareCalculation(preset) {
+  const v = preset.values;
+  if (preset.id === "dual555") {
+    const f = 1.44 / (((v.r1 + 2 * v.r2) * 1000) * (v.c * 1e-9));
+    return `<span>Calculated timing</span><strong>${f.toFixed(1)} Hz</strong><code>f ≈ 1.44 / ((${v.r1} kΩ + 2×${v.r2} kΩ) × ${v.c} nF)</code><p>Component tolerance means a physical frequency will differ.</p>`;
+  }
+  if (preset.id === "opampFuzz") {
+    const gain = v.rf / v.rin;
+    const fc = 1 / (2 * Math.PI * 10000 * v.toneC * 1e-9);
+    return `<span>Calculated relationships</span><strong>${gain.toFixed(1)}× gain · ${fc.toFixed(0)} Hz corner</strong><code>|A| ≈ ${v.rf} kΩ / ${v.rin} kΩ; fc = 1/(2π×10 kΩ×${v.toneC} nF)</code><p>Diodes limit the unclipped gain in practice.</p>`;
+  }
+  const rate = 1 / (2.2 * v.clockR * 1000 * v.clockC * 1e-6);
+  return `<span>Calculated RC estimate</span><strong>${rate.toFixed(1)} Hz</strong><code>f ≈ 1 / (2.2 × ${v.clockR} kΩ × ${v.clockC} µF)</code><p>CD40106 thresholds and part tolerances shift the physical rate.</p>`;
+}
+
+function renderIllustratedBom() {
+  const preset = hardwarePreset();
+  let total = 0;
+  $("#illustrated-components").innerHTML = preset.components.map((component) => {
+    total += component.qty * component.cost;
+    return `<article class="part-item">
+      <div class="part-icon">${componentIcon(component.kind)}</div>
+      <div><span>${component.ref} · qty ${component.qty}</span><strong>${component.name}</strong><p>${componentValue(component, preset)}</p><small>${component.note}</small><a href="https://www.amazon.com/s?k=${encodeURIComponent(component.query)}" target="_blank" rel="noopener noreferrer">Find on Amazon US ↗</a></div>
+    </article>`;
+  }).join("");
+  $("#hardware-cost").textContent = `$${total.toFixed(2)}`;
+}
+
+function schematicSvg(preset) {
+  const v = preset.values;
+  const header = `<svg class="technical-svg" viewBox="0 0 980 520" role="img" aria-label="${preset.name} labeled construction schematic"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z" fill="currentColor"/></marker></defs><rect width="980" height="520" fill="#f7f8f3"/><text x="34" y="42" class="svg-title">${preset.name}</text><text x="34" y="66" class="svg-note">9 V DC · TOP VIEW PIN REFERENCES · NOT PHYSICALLY TESTED</text>`;
+  if (preset.id === "dual555") return `${header}
+    <path class="rail plus" d="M70 100H910"/><text x="72" y="92">+9 V</text><path class="rail ground" d="M70 455H910"/><text x="72" y="478">GND</text>
+    <g transform="translate(185 145)"><rect class="ic-body" width="190" height="185"/><path d="M80 0q15 20 30 0" class="symbol"/><text x="95" y="90" text-anchor="middle" class="ic-name">U1 NE555P</text><text x="12" y="25">8 VCC</text><text x="12" y="165">1 GND</text><text x="125" y="25">4 RESET</text><text x="112" y="165">3 OUT</text><text x="12" y="58">7 DISCH</text><text x="12" y="126">2 TRIG</text><text x="116" y="126">6 THRES</text><text x="116" y="58">5 CONT</text></g>
+    <g transform="translate(610 145)"><rect class="ic-body" width="190" height="185"/><path d="M80 0q15 20 30 0" class="symbol"/><text x="95" y="90" text-anchor="middle" class="ic-name">U2 NE555P</text><text x="12" y="25">8 VCC</text><text x="12" y="165">1 GND</text><text x="125" y="25">4 RESET</text><text x="112" y="165">3 OUT</text><text x="12" y="58">7 DISCH</text><text x="12" y="126">2 TRIG</text><text x="116" y="126">6 THRES</text><text x="116" y="58">5 CONT</text></g>
+    <path class="wire" d="M220 145V100m120 45v-45M645 145v-45m120 45v-45M220 330v125M645 330v125"/>
+    <path class="wire blue" d="M197 203H130v70h67m166 0h70v88H320m302-158h-67v70h67m166 0h70v88H745"/>
+    <g class="component-label"><text x="78" y="188">R1 ${v.r1} kΩ</text><text x="76" y="226">P1 ${v.r2} kΩ</text><text x="370" y="382">C1 ${v.c} nF</text><text x="502" y="188">R3 ${v.r1} kΩ</text><text x="500" y="226">P2 100 kΩ</text><text x="796" y="382">C3 ${v.c} nF</text></g>
+    <path class="wire signal" d="M297 310v75h125m266-75v75H562m-140 0h140"/><rect x="454" y="365" width="76" height="40" class="component-box"/><text x="492" y="390" text-anchor="middle">MIX R5/R6</text><path class="wire signal" d="M530 385h145v45h160"/><text x="700" y="420">P3 ${v.mix}% → C5 → OUTPUT</text></svg>`;
+  if (preset.id === "opampFuzz") return `${header}
+    <path class="rail plus" d="M50 95H930"/><text x="55" y="86">+9 V</text><path class="rail ground" d="M50 460H930"/><text x="55" y="483">GND</text>
+    <path class="wire" d="M120 95v75m0 70v70m0 70v80"/><path class="resistor-symbol" d="M120 170l-10 7 20 12-20 12 20 12-10 7"/><path class="resistor-symbol" d="M120 310l-10 7 20 12-20 12 20 12-10 7"/><text x="138" y="198">R1 100 kΩ</text><text x="138" y="338">R2 100 kΩ</text><circle cx="120" cy="270" r="5"/><text x="140" y="276">VBIAS ≈ 4.5 V</text>
+    <path class="wire purple" d="M120 270h160"/><path class="opamp" d="M280 225v90l95-45z"/><text x="295" y="251">+ 5</text><text x="295" y="298">− 6</text><text x="333" y="274">U1B</text><path class="wire purple" d="M375 270h75v75h-145v-48"/><text x="385" y="257">7 VREF</text>
+    <path class="wire signal" d="M40 385h90"/><text x="42" y="375">INPUT</text><rect x="130" y="365" width="62" height="38" class="component-box"/><text x="161" y="389" text-anchor="middle">C2</text><path class="wire signal" d="M192 385h62"/><path class="resistor-symbol" d="M254 385l8-10 12 20 12-20 12 20 12-10h50"/><text x="260" y="420">R3 ${v.rin} kΩ</text>
+    <path class="opamp" d="M360 335v100l110-50z"/><text x="376" y="365">− 2</text><text x="376" y="415">+ 3</text><text x="413" y="389">U1A</text><path class="wire purple" d="M360 410H280V270"/><path class="wire signal" d="M470 385h92"/>
+    <path class="wire orange" d="M455 355v-72H330v72"/><path class="resistor-symbol" d="M355 283l8-10 12 20 12-20 12 20 12-10"/><text x="348" y="261">R4 ${v.rf} kΩ</text><path class="wire yellow" d="M350 320h84"/><path class="diode-symbol" d="M370 310v20l22-10zm22-10v40m20-30v20l-22-10zm-22-10v40"/><text x="350" y="345">D1/D2 1N4148 antiparallel</text>
+    <rect x="562" y="365" width="95" height="40" class="component-box"/><text x="609" y="389" text-anchor="middle">R5 10 kΩ</text><path class="wire signal" d="M657 385h78"/><path class="wire" d="M705 385v75"/><text x="674" y="440">C4 ${v.toneC} nF</text><path class="wire signal" d="M735 385h195"/><text x="755" y="374">P1 ${v.level}% → C3 → OUTPUT</text></svg>`;
+  return `${header}
+    <path class="rail plus" d="M60 95H920"/><text x="65" y="86">+9 V</text><path class="rail ground" d="M60 445H920"/><text x="65" y="470">GND</text>
+    <rect x="165" y="150" width="250" height="205" class="ic-body"/><text x="290" y="185" text-anchor="middle" class="ic-name">U1 CD40106BE · PDIP-14</text><path class="inverter" d="M240 225v80l95-40z"/><circle cx="346" cy="265" r="11" class="symbol"/><text x="205" y="270">1 A</text><text x="355" y="270">2 /A</text><text x="180" y="330">14 VDD → +9 V · 7 VSS → GND</text>
+    <path class="wire blue" d="M357 265h145v-105H210v65"/><path class="resistor-symbol" d="M410 160l8-10 12 20 12-20 12 20 12-10"/><text x="382" y="138">R1 1 kΩ + P1 ${v.clockR} kΩ</text><path class="wire" d="M210 265H110v180"/><path d="M90 355h40m-40 14h40" class="symbol"/><text x="62" y="342">C1</text><text x="54" y="390">${v.clockC} µF</text>
+    <path class="wire signal" d="M357 265h205"/><path class="resistor-symbol" d="M500 265l8-10 12 20 12-20 12 20 12-10"/><rect x="562" y="245" width="70" height="40" class="component-box"/><text x="597" y="270" text-anchor="middle">C2 1 µF</text><path class="wire signal" d="M632 265h270"/><text x="682" y="249">P2 ${v.depth}% → OUTPUT</text><text x="515" y="330">Unused inputs 3, 5, 9, 11, 13 → GND</text></svg>`;
+}
+
+function holePoint(hole) {
+  const rail = hole[0] === "+" || hole[0] === "-";
+  if (rail) return { x: 54 + (Number(hole.slice(1)) - 1) * 24, y: hole[0] === "+" ? 57 : 82 };
+  const letter = hole[0].toUpperCase();
+  const col = Number(hole.slice(1));
+  const ys = { A:132, B:152, C:172, D:192, E:212, F:262, G:282, H:302, I:322, J:342 };
+  return { x: 54 + (col - 1) * 24, y: ys[letter] };
+}
+
+function breadboardSvg(preset) {
+  let holes = "";
+  for (let col = 1; col <= 30; col++) {
+    const x = 54 + (col - 1) * 24;
+    holes += `<text x="${x}" y="118" text-anchor="middle">${col}</text><circle cx="${x}" cy="57" r="3" class="rail-hole plus-hole"/><circle cx="${x}" cy="82" r="3" class="rail-hole ground-hole"/>`;
+    for (const y of [132,152,172,192,212,262,282,302,322,342]) holes += `<circle cx="${x}" cy="${y}" r="3.2" class="board-hole"/>`;
+  }
+  const letters = Object.entries({A:132,B:152,C:172,D:192,E:212,F:262,G:282,H:302,I:322,J:342}).map(([l,y])=>`<text x="20" y="${y+4}">${l}</text>`).join("");
+  const wires = preset.boardWires.map(([from,to,color]) => { const a=holePoint(from), b=holePoint(to); return `<path class="board-wire ${color}" d="M${a.x} ${a.y} C${a.x} ${(a.y+b.y)/2} ${b.x} ${(a.y+b.y)/2} ${b.x} ${b.y}"/><circle cx="${a.x}" cy="${a.y}" r="5" class="wire-end ${color}"/><circle cx="${b.x}" cy="${b.y}" r="5" class="wire-end ${color}"/>`; }).join("");
+  const parts = preset.placements.map((part) => {
+    if (part.kind.startsWith("dip")) {
+      const pins = part.kind === "dip14" ? 7 : 4;
+      const x = 54 + (part.col - 1) * 24 - 8;
+      const width = (pins - 1) * 24 + 16;
+      const pinLabels = Array.from({length:pins},(_,i)=>`<text x="${x+8+i*24}" y="253" text-anchor="middle">${i+1}</text><text x="${x+8+i*24}" y="228" text-anchor="middle">${pins*2-i}</text>`).join("");
+      return `<g><rect x="${x}" y="218" width="${width}" height="38" class="board-ic"/><path d="M${x} 229q13 8 0 16" class="symbol"/><text x="${x+width/2}" y="244" text-anchor="middle" class="board-label">${part.ref} ${part.label}</text>${pinLabels}</g>`;
+    }
+    const a=holePoint(part.from), b=holePoint(part.to), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    if (part.kind === "resistor") return `<g><path d="M${a.x} ${a.y}L${mx-22} ${my}m44 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-22}" y="${my-8}" width="44" height="16" rx="6" class="board-resistor"/><text x="${mx}" y="${my-12}" text-anchor="middle" class="board-label">${part.ref} ${part.label}</text></g>`;
+    if (part.kind === "diode") return `<g><path d="M${a.x} ${a.y}L${mx-20} ${my}m40 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-20}" y="${my-7}" width="40" height="14" class="board-diode"/><path d="M${mx+12} ${my-7}v14" class="diode-band"/><text x="${mx}" y="${my-12}" text-anchor="middle" class="board-label">${part.ref}</text></g>`;
+    return `<g><path d="M${a.x} ${a.y}L${mx-8} ${my}m16 0L${b.x} ${b.y}" class="part-lead"/><path d="M${mx-8} ${my-13}v26m16-26v26" class="board-cap"/><text x="${mx}" y="${my-17}" text-anchor="middle" class="board-label">${part.ref} ${part.label}</text></g>`;
+  }).join("");
+  return `<svg class="technical-svg breadboard-svg" viewBox="0 0 790 410" role="img" aria-label="${preset.name} breadboard placement, top view"><rect x="4" y="20" width="780" height="370" rx="8" class="breadboard-body"/><path d="M35 232H765" class="board-trench"/><path d="M35 57H765M35 82H765" class="board-rail"/><text x="20" y="61" class="plus-text">+</text><text x="20" y="86" class="minus-text">−</text>${letters}${holes}${wires}${parts}<text x="395" y="382" text-anchor="middle" class="svg-note">TOP VIEW · BB830-STYLE · VERIFY RAIL CONTINUITY · CONNECTION TABLE IS AUTHORITATIVE</text></svg>`;
+}
+
+function renderConstruction() {
+  const preset = hardwarePreset();
+  const panel = $("#construction-panel");
+  if (state.constructionView === "schematic") panel.innerHTML = `<div class="graphic-heading"><div><p class="evidence-label">Construction schematic</p><h2>${preset.name}</h2></div><span>Calculated / not physically tested</span></div>${schematicSvg(preset)}<p class="graphic-caption">Reference designators and values match the parts tray. Use the Connections view as the wiring source of truth.</p>`;
+  if (state.constructionView === "breadboard") panel.innerHTML = `<div class="graphic-heading"><div><p class="evidence-label">Breadboard layout</p><h2>${preset.name}</h2></div><span>Top view · power disconnected</span></div>${breadboardSvg(preset)}<p class="graphic-caption">Colored paths show jumpers; component leads terminate at named holes. Off-board pots and jacks are defined in the Connections view.</p>`;
+  if (state.constructionView === "connections") panel.innerHTML = `<div class="graphic-heading"><div><p class="evidence-label">Canonical connection table</p><h2>${preset.name}</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${row[0]}</strong></td><td>${row.slice(1,-2).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${row.at(-1)}</td></tr>`).join("")}</tbody></table></div>`;
+  if (state.constructionView === "pinouts") panel.innerHTML = `<div class="graphic-heading"><div><p class="evidence-label">Manufacturer-verified pinouts</p><h2>${preset.name}</h2></div><span>Top view · confirm notch before power</span></div>${preset.pinouts.map((key)=>{const item=window.HARDWARE_PINOUTS[key];return `<section class="pinout-section"><h3>${item.identity}</h3><p>${item.orientation}</p><div class="connection-table-wrap"><table class="connection-table pinout-table"><thead><tr><th>Pin</th><th>Name</th><th>Role in this component</th></tr></thead><tbody>${item.pins.map(([number,name,role])=>`<tr><td>${number}</td><td><strong>${name}</strong></td><td>${role}</td></tr>`).join("")}</tbody></table></div><a href="${item.source}" target="_blank" rel="noopener noreferrer">Open manufacturer source ↗</a></section>`;}).join("")}`;
+  if (state.constructionView === "assembly") panel.innerHTML = `<div class="graphic-heading"><div><p class="evidence-label">Power-off assembly</p><h2>${preset.name}</h2></div><span>Complete one step at a time</span></div><ol class="assembly-list">${preset.assembly.map((step,index)=>`<li><span>${String(index+1).padStart(2,"0")}</span><p>${step}</p></li>`).join("")}</ol>`;
+}
+
+function renderHardwareSources() {
+  const preset = hardwarePreset();
+  $("#hardware-sources").innerHTML = `<strong>Pinout sources</strong>${preset.sources.map(([label,url])=>`<a href="${url}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`).join("")}`;
+}
+
+function renderHardware() {
+  renderHardwareSelector();
+  renderHardwareControls();
+  renderIllustratedBom();
+  renderConstruction();
+  renderHardwareSources();
+}
+
+function loadHardwareSound() {
+  const preset = hardwarePreset();
+  state.modules = preset.chain.map((type) => ({ id: nextId++, type, bypassed: false, params: freshParams(type) }));
+  preset.controls.forEach((control) => {
+    const module = state.modules[control.audio.module];
+    if (module) module.params[control.audio.key] = preset.values[control.key];
+  });
+  if (preset.id === "dual555") state.modules[0].params.voices = "dual";
+  if (preset.id === "opampFuzz") state.modules[0].params.diode = "silicon";
+  state.selectedId = state.modules[0]?.id ?? null;
+  state.hardwareLoadedId = preset.id;
+  renderStudio();
+  rebuildAudioGraph();
+  announce(`${preset.name} sound model loaded. Open Studio to listen.`);
+}
+
 function showView(viewId) {
   $$(".view").forEach((view) => { view.hidden = view.id !== viewId; view.classList.toggle("is-active", view.id === viewId); });
   $$(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === viewId));
   if (viewId === "build") renderBom();
+  if (viewId === "hardware") renderHardware();
   const heading = $(`#${viewId} h1`);
   if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
 }
@@ -904,6 +1074,36 @@ function bindEvents() {
   $("#download-bom").addEventListener("click", downloadBom);
   $("#print-build").addEventListener("click", () => window.print());
   $("#download-stl").addEventListener("click", downloadStl);
+  $("#hardware-preset").addEventListener("change", (event) => {
+    state.hardwarePreset = event.target.value;
+    state.hardwareLoadedId = null;
+    renderHardware();
+    announce(`${hardwarePreset().name} build guide selected.`);
+  });
+  $("#load-hardware-sound").addEventListener("click", loadHardwareSound);
+  $("#hardware-controls").addEventListener("input", (event) => {
+    const input = event.target.closest("[data-hardware-key]");
+    if (!input) return;
+    const preset = hardwarePreset();
+    const control = preset.controls.find((item) => item.key === input.dataset.hardwareKey);
+    preset.values[control.key] = Number(input.value);
+    $(`#hardware-value-${control.key}`).textContent = `${input.value} ${control.unit}`;
+    if (state.hardwareLoadedId === preset.id) {
+      const module = state.modules[control.audio.module];
+      if (module) module.params[control.audio.key] = Number(input.value);
+      rebuildAudioGraph(); renderChain(); renderInspector();
+    }
+    renderIllustratedBom();
+    $(".hardware-calculation").innerHTML = hardwareCalculation(preset);
+    if (state.constructionView === "schematic" || state.constructionView === "breadboard") renderConstruction();
+  });
+  $(".construction-tabs").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-construction]");
+    if (!button) return;
+    state.constructionView = button.dataset.construction;
+    $$("[data-construction]").forEach((tab) => tab.setAttribute("aria-selected", String(tab === button)));
+    renderConstruction();
+  });
   $("#experiment-form").addEventListener("submit", (event) => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
@@ -917,4 +1117,5 @@ function bindEvents() {
 renderLibrary();
 bindEvents();
 loadPreset();
+renderHardware();
 drawScopes();

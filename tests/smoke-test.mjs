@@ -5,10 +5,11 @@ import { dirname, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
-const [html, css, js, readme] = await Promise.all([
+const [html, css, js, hardware, readme] = await Promise.all([
   readFile(resolve(root, "index.html"), "utf8"),
   readFile(resolve(root, "styles.css"), "utf8"),
   readFile(resolve(root, "app.js"), "utf8"),
+  readFile(resolve(root, "hardware-data.js"), "utf8"),
   readFile(resolve(root, "README.md"), "utf8")
 ]);
 
@@ -17,6 +18,8 @@ assert.match(html, /id="audio-toggle"/);
 assert.match(html, /id="signal-chain"/);
 assert.match(html, /id="bom-body"/);
 assert.match(html, /id="download-stl"/);
+assert.match(html, /id="hardware-preset"/);
+assert.match(html, /id="construction-panel"/);
 assert.match(html, /aria-live="polite"/);
 
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
@@ -30,6 +33,13 @@ assert.match(js, /createDynamicsCompressor/);
 assert.match(js, /navigator\.mediaDevices\.getUserMedia/);
 assert.match(js, /amazon\.com\/s\?k=/);
 assert.match(js, /solid circuit_bending_enclosure/);
+assert.match(js, /function breadboardSvg/);
+assert.match(js, /function schematicSvg/);
+for (const preset of ["dual555", "opampFuzz", "glitchClock"]) {
+  assert.match(hardware, new RegExp(`\\b${preset}: \\{`), `Missing ${preset} hardware preset`);
+}
+assert.match(hardware, /pin 8 · E10/);
+assert.match(hardware, /pin 14 · E10/);
 assert.match(css, /prefers-reduced-motion/);
 assert.match(readme, /GitHub Pages/);
 

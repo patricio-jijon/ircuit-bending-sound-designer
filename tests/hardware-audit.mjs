@@ -1,0 +1,43 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+globalThis.window = {};
+Function(await readFile(resolve(root, "hardware-data.js"), "utf8"))();
+
+const colors = new Set(["red", "black", "blue", "green", "yellow", "orange", "purple", "red/black", "red/blue", "yellow/green"]);
+const hole = /^(?:[A-J](?:[1-9]|[12][0-9]|30)|[+-](?:[1-9]|[12][0-9]|30))$/;
+
+assert.equal(Object.keys(window.HARDWARE_PRESETS).length, 3);
+for (const [key, preset] of Object.entries(window.HARDWARE_PRESETS)) {
+  assert.equal(key, preset.id);
+  assert(preset.name && preset.summary && preset.guide);
+  assert(preset.controls.length >= 3);
+  assert(preset.components.length >= 10);
+  assert(preset.connections.length >= 7);
+  assert(preset.assembly.length >= 8);
+  assert(preset.sources.every(([, url]) => url.startsWith("https://")));
+  for (const control of preset.controls) {
+    assert(Number.isFinite(preset.values[control.key]), `${key}: missing ${control.key}`);
+    assert(preset.chain[control.audio.module], `${key}: audio module index missing`);
+  }
+  for (const row of preset.connections) {
+    assert(row.length >= 6, `${key}: incomplete connection`);
+    assert(colors.has(row.at(-2)), `${key}: unknown wire color ${row.at(-2)}`);
+  }
+  for (const [from, to] of preset.boardWires) {
+    assert(hole.test(from), `${key}: invalid hole ${from}`);
+    assert(hole.test(to), `${key}: invalid hole ${to}`);
+  }
+  for (const pinoutKey of preset.pinouts) {
+    const pinout = window.HARDWARE_PINOUTS[pinoutKey];
+    assert(pinout?.source.startsWith("https://"));
+    const expected = pinoutKey === "CD40106BE" ? 14 : 8;
+    assert.equal(pinout.pins.length, expected, `${pinoutKey}: pin count mismatch`);
+    assert.deepEqual(pinout.pins.map((pin) => pin[0]), Array.from({ length: expected }, (_, i) => i + 1));
+  }
+}
+
+console.log("Hardware audit passed: 3 presets, pin counts, named holes, connections, sources, and audio mappings.");

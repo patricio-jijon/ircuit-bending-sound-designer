@@ -6,6 +6,7 @@
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="hardware-data.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -20,6 +21,7 @@
       <button class="tab is-active" type="button" data-view="studio">Studio</button>
       <button class="tab" type="button" data-view="learn">Learn</button>
       <button class="tab" type="button" data-view="build">Build &amp; budget</button>
+      <button class="tab" type="button" data-view="hardware">Hardware lab</button>
       <button class="tab" type="button" data-view="experiment">Experiment</button>
     </nav>
     <button id="audio-toggle" class="audio-toggle" type="button" aria-pressed="false">
@@ -162,6 +164,52 @@
           <p id="stl-note" class="fine-print">This open-top reference shell is generated from your dimensions. It has no component cutouts and is not guaranteed to fit real hardware. Verify every part with its manufacturer drawing before fabrication.</p>
         </section>
       </div>
+    </section>
+
+    <section id="hardware" class="view hardware-view" aria-labelledby="hardware-title" hidden>
+      <div class="hardware-toolbar">
+        <div>
+          <span class="section-number">Build-ready presets</span>
+          <h1 id="hardware-title">From sound to breadboard</h1>
+        </div>
+        <div class="preset-picker">
+          <label for="hardware-preset">Circuit preset</label>
+          <select id="hardware-preset"></select>
+          <button id="load-hardware-sound" type="button">Load sound</button>
+          <a id="download-guide" class="download-guide" href="guides/dual-555-drone-build-guide.pdf" download>Download PDF guide</a>
+        </div>
+      </div>
+      <div class="hardware-status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <strong>Datasheet-verified pinouts</strong>
+        <span>9 V DC · calculated + browser-simulated · not physically tested</span>
+      </div>
+      <div class="hardware-layout">
+        <aside class="parts-drawer" aria-labelledby="parts-drawer-title">
+          <div class="panel-heading"><div><span class="section-number">A</span><h2 id="parts-drawer-title">Adjust parts</h2></div><p>Values update the drawing, budget, and sound model.</p></div>
+          <div id="hardware-controls" class="hardware-controls"></div>
+        </aside>
+        <div class="construction-workspace">
+          <div class="construction-tabs" role="tablist" aria-label="Construction views">
+            <button type="button" role="tab" aria-selected="true" data-construction="schematic">Schematic</button>
+            <button type="button" role="tab" aria-selected="false" data-construction="breadboard">Breadboard</button>
+            <button type="button" role="tab" aria-selected="false" data-construction="connections">Connections</button>
+            <button type="button" role="tab" aria-selected="false" data-construction="pinouts">Pinouts</button>
+            <button type="button" role="tab" aria-selected="false" data-construction="assembly">Assembly</button>
+          </div>
+          <section id="construction-panel" class="construction-panel" aria-live="polite"></section>
+        </div>
+        <aside class="illustrated-bom" aria-labelledby="illustrated-bom-title">
+          <div class="panel-heading"><div><span class="section-number">B</span><h2 id="illustrated-bom-title">Parts tray</h2></div><p>One complete preset build.</p></div>
+          <div id="illustrated-components" class="illustrated-components"></div>
+          <div class="hardware-total"><span>Estimated parts</span><strong id="hardware-cost">$0.00</strong></div>
+        </aside>
+      </div>
+      <section class="hardware-notes" aria-labelledby="hardware-notes-title">
+        <h2 id="hardware-notes-title">Build boundary</h2>
+        <p>Disconnect power before changing any connection. Use a current-limited 9 V DC supply. Outputs are intended for a powered speaker, amplifier, or audio interface input, never a bare low-impedance speaker. Confirm breadboard rail continuity and polarized capacitor orientation before power-up.</p>
+        <div id="hardware-sources" class="hardware-sources"></div>
+      </section>
     </section>
 
     <section id="experiment" class="view content-view" aria-labelledby="experiment-title" hidden>

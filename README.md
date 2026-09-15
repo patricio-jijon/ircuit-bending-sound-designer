@@ -32,6 +32,8 @@ GitHub will provide the public URL after deployment completes.
 - Component controls with substituted formulas and plain-language explanations
 - Quantity-aware concept BOM, editable USD estimates, Amazon US search links, and CSV export
 - Dimension-based generic open-top enclosure STL export
+- Hardware Lab with synchronized schematics, named breadboard holes, canonical connection tables, power-off assembly steps, component illustrations, and preset-specific Amazon searches
+- Three physical-build presets: Dual 555 Drone, TL072 Diode Fuzz, and 40106 Glitch Clock
 - Guided prediction, observation, and reflection activity
 - Keyboard focus, semantic controls, responsive layouts, and reduced-motion support
 
@@ -40,6 +42,8 @@ GitHub will provide the public URL after deployment completes.
 The sound is a real-time **digital behavioral simulation**. Formulas shown as calculated are circuit relationships; the waveform and spectrum are simulated browser audio. The app does not claim physical measurements or transistor-level simulation.
 
 The bill of materials is a concept budget, not a construction-ready circuit. Amazon prices are not fetched automatically and can change. Verify part values, package, voltage and power ratings, pinouts, polarity, availability, and seller before buying or building.
+
+The **Hardware Lab** is more specific than the freeform sound studio. Its three physical presets use named through-hole IC variants and manufacturer pinout sources. They are calculated and diagram-audited but have not been physically assembled or measured. Freeform octave, delay, and combined DSP chains remain simulation-only until separate hardware designs are validated.
 
 The downloaded STL is a generic reference shell made from the entered dimensions. It has no connector or control cutouts. Measure exact physical components and verify manufacturer mechanical drawings before fabrication.
 
@@ -50,12 +54,15 @@ Keep physical experiments between 3.3 V and 12 V DC. Disconnect power before cha
 ## Technical reference
 
 - [Texas Instruments NE555 datasheet](https://www.ti.com/lit/ds/symlink/ne555.pdf)
+- [Texas Instruments TL072 product and datasheet](https://www.ti.com/product/TL072)
+- [Texas Instruments CD40106B datasheet](https://www.ti.com/lit/ds/symlink/cd40106b.pdf)
 
 ## Project structure
 
 - `index.html` — accessible application structure
 - `styles.css` — responsive visual system
 - `app.js` — module definitions, audio graph, calculations, budget, and exports
+- `hardware-data.js` — exact hardware preset inventories, connections, placements, assembly steps, and sources
 
 No dependencies or build step are required.
 
