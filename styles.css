@@ -404,7 +404,7 @@ td input { width: 76px; }
 .technical-svg .ic-body { fill: #e5e9df; stroke: #242b22; stroke-width: 2; }
 .technical-svg .ic-name { font-weight: 800; }
 .technical-svg .component-box { fill: #fff; stroke: #333b30; }
-.interactive-component { cursor: context-menu; }
+.interactive-component { cursor: pointer; touch-action: manipulation; }
 .interactive-component:hover, .interactive-component:focus { filter: drop-shadow(0 0 5px rgba(103, 164, 255, .95)); outline: none; }
 .component-hitbox { fill: rgba(113, 199, 255, .04); stroke: transparent; stroke-width: 3; pointer-events: all; }
 .interactive-component:hover .component-hitbox, .interactive-component:focus .component-hitbox { fill: rgba(113, 199, 255, .12); stroke: #2377b9; stroke-dasharray: 7 4; }
@@ -448,6 +448,7 @@ td input { width: 76px; }
 .illustrated-bom { border-left: 1px solid var(--line); background: var(--surface); }
 .illustrated-components { max-height: 650px; overflow-y: auto; }
 .part-item { display: grid; grid-template-columns: 72px 1fr; gap: 10px; padding: 13px 15px; border-bottom: 1px solid #30352d; }
+.part-item.interactive-component:hover, .part-item.interactive-component:focus-visible { background: #222920; box-shadow: inset 3px 0 #71c7ff; }
 .part-icon { display: grid; place-items: center; height: 52px; background: #eef0e8; }
 .part-icon svg { width: 68px; height: 42px; }
 .part-icon svg path, .part-icon svg rect, .part-icon svg circle { fill: none; stroke: #222a20; stroke-width: 2; }
