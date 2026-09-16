@@ -1255,23 +1255,47 @@ body h4,
 .module-nudges button:hover { border-color: var(--module-color); color: var(--module-color); }
 
 .synth-reference-boundary { margin: 0 0 14px; padding: 12px; border-left: 3px solid #fff; background: #56595c; color: #fff; font-size: .7rem; }
-.synth-reference-list { display: grid; gap: 1px; background: var(--line); }
-.synth-reference-card { padding: 16px; background: #5c5f62; }
-.synth-reference-card header { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 8px 12px; }
-.synth-reference-card header span { color: #fff; font: 800 .58rem ui-monospace, monospace; text-transform: uppercase; }
-.synth-reference-card h3 { margin: 0; font-size: .9rem; }
-.synth-reference-card header b { color: #fff; font-size: .58rem; font-weight: 650; text-align: right; }
+.synth-explorer { display: grid; grid-template-columns: 250px minmax(620px,1fr); gap: 1px; background: var(--line); }
+.synth-reference-list { display: grid; align-content: start; gap: 1px; background: var(--line); }
+.synth-reference-card { display: grid; gap: 4px; width: 100%; padding: 12px; border: 0; border-left: 3px solid transparent; border-radius: 0; background: #494c4f; color: #fff; text-align: left; }
+.synth-reference-card:hover,
+.synth-reference-card:focus-visible { background: #62666a; }
+.synth-reference-card.is-selected { border-left-color: #d8ff45; background: #686d71; }
+.synth-reference-card span { font: 800 .53rem ui-monospace, monospace; text-transform: uppercase; }
+.synth-reference-card strong { font-size: .72rem; }
+.synth-reference-card small { color: #fff; font-size: .53rem; line-height: 1.35; }
+.synth-circuit-viewer { min-width: 0; padding: 16px; background: #5c5f62; }
+.synth-circuit-viewer header { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; }
+.synth-circuit-viewer header span { color: #fff; font: 800 .58rem ui-monospace, monospace; text-transform: uppercase; }
+.synth-circuit-viewer h3 { margin: 3px 0 0; font-size: 1rem; }
+.synth-circuit-viewer header b { color: #fff; font-size: .58rem; text-align: right; }
+.synth-board-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid #878d91; background: #292c2f; }
+.synth-board-svg { display: block; min-width: 720px; width: 100%; height: auto; }
+.synth-board-pcb { fill: #3d5b50; stroke: #b8c3bf; stroke-width: 2; }
+.synth-board-rail { fill: none; stroke: #e5d473; stroke-width: 3; }
+.synth-board-trace { fill: none; stroke: #e4cc68; stroke-width: 4; }
+.synth-board-via { fill: #1f2925; stroke: #e4cc68; stroke-width: 2; }
+.synth-board-block rect { fill: #202427; stroke: #d8dde0; stroke-width: 2; }
+.synth-board-block text { fill: #fff; font: 800 11px ui-monospace, monospace; }
+.synth-board-block .synth-board-name { font-size: 8px; }
+.synth-board-notch,
+.synth-board-pin,
+.synth-board-part { fill: none; stroke: #eef1f2; stroke-width: 2; }
+.synth-board-svg > text,
+.synth-board-svg g > text { fill: #fff; font: 700 9px ui-monospace, monospace; }
+.synth-board-svg .synth-board-caption { font-size: 9px; }
 .synth-flow { display: flex; flex-wrap: wrap; gap: 5px; margin: 13px 0; }
 .synth-flow span { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid #92979b; background: #44474a; color: #fff; font: 650 .58rem ui-monospace, monospace; }
 .synth-flow i { color: #d8ff45; font-style: normal; }
-.synth-reference-card p { margin: 0; color: #fff; font-size: .68rem; }
-.synth-reference-card a { display: inline-block; margin-top: 10px; color: #fff; font-size: .64rem; font-weight: 750; }
+.synth-circuit-viewer p { margin: 0; color: #fff; font-size: .68rem; }
+.synth-circuit-viewer a { display: inline-block; margin-top: 10px; color: #fff; font-size: .64rem; font-weight: 750; }
 
 @media (max-width: 1180px) {
   .synth-control-strip { grid-template-columns: repeat(4,1fr); }
   .synth-keyboard-panel { grid-template-columns: 1fr; overflow-x: auto; }
   .sequencer-layout { grid-template-columns: 1fr; }
   .pattern-editor { overflow-x: auto; border-right: 0; border-bottom: 1px solid #707478; }
+  .synth-explorer { grid-template-columns: 210px minmax(620px,1fr); overflow-x: auto; }
 }
 
 @media (max-width: 650px) {
@@ -1282,6 +1306,9 @@ body h4,
   .synth-keyboard { height: 96px; }
   .bar-tabs span { display: none; }
   .midi-editor { padding: 12px; }
-  .synth-reference-card header { grid-template-columns: 1fr; }
-  .synth-reference-card header b { text-align: left; }
+  .synth-explorer { display: block; overflow: visible; }
+  .synth-reference-list { grid-template-columns: repeat(2,minmax(0,1fr)); margin-bottom: 1px; }
+  .synth-circuit-viewer { padding: 12px; }
+  .synth-circuit-viewer header { align-items: flex-start; flex-direction: column; }
+  .synth-circuit-viewer header b { text-align: left; }
 }
