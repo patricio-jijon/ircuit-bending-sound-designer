@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=13">
-  <script src="hardware-data.js?v=13" defer></script>
-  <script src="devices-data.js?v=13" defer></script>
-  <script src="app.js?v=13" defer></script>
+  <link rel="stylesheet" href="styles.css?v=14">
+  <script src="hardware-data.js?v=14" defer></script>
+  <script src="devices-data.js?v=14" defer></script>
+  <script src="app.js?v=14" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -171,18 +171,21 @@
     <section id="hardware" class="view hardware-view is-active" aria-labelledby="hardware-title">
       <div class="hardware-toolbar">
         <div class="hardware-title-block"><span class="section-number">Physical computing workspace</span><h1 id="hardware-title">Circuit Builder</h1></div>
-        <label class="preset-field" for="hardware-preset"><span>Verified circuit</span><select id="hardware-preset"></select></label>
+        <div class="circuit-picker-field"><label class="preset-field" for="hardware-preset"><span>Verified circuit</span><select id="hardware-preset"></select></label><button id="browse-circuits" type="button">Circuit folders</button></div>
         <div class="workbench-tools" aria-label="Workspace tools">
           <button id="hardware-undo" class="tool-button" type="button" title="Undo component change" aria-label="Undo component change" disabled>↶</button>
           <button id="hardware-redo" class="tool-button" type="button" title="Redo component change" aria-label="Redo component change" disabled>↷</button>
           <label class="zoom-control" for="workspace-zoom"><span>Zoom</span><input id="workspace-zoom" type="range" min="75" max="140" step="5" value="100"><output id="workspace-zoom-value">100%</output></label>
         </div>
         <div class="simulation-tools">
+          <label class="compact-field" for="supply-select"><span>Supply</span><select id="supply-select" aria-label="Circuit supply voltage"></select></label>
+          <label class="compact-field" for="knob-style"><span>Knobs</span><select id="knob-style" aria-label="Physical knob style"><option value="pointer">Pointer</option><option value="skirted">Skirted</option><option value="aluminum">Aluminum</option></select></label>
           <label class="sr-only" for="hardware-source-select">Simulation sound source</label>
           <select id="hardware-source-select" aria-label="Simulation sound source"><option value="demo">Built-in riff</option><option value="tone">Test tone</option><option value="microphone">Microphone / guitar interface</option></select>
           <button id="load-hardware-sound" class="secondary-button" type="button">Reset preset</button>
           <button id="hardware-audio-toggle" class="hardware-audio-toggle" type="button" aria-pressed="false">Start simulation</button>
           <a id="download-guide" class="download-guide" href="guides/dual-555-drone-build-guide.pdf" download>Build guide</a>
+          <button id="open-engineering-help" class="help-button" type="button">Help</button>
         </div>
       </div>
       <div class="hardware-status">
@@ -217,7 +220,7 @@
       </div>
       <section class="hardware-notes" aria-labelledby="hardware-notes-title">
         <h2 id="hardware-notes-title">Build boundary</h2>
-        <p>Disconnect power before changing any connection. Use a current-limited 9 V DC supply. Outputs are intended for a powered speaker, amplifier, or audio interface input, never a bare low-impedance speaker. Confirm breadboard rail continuity and polarized capacitor orientation before power-up.</p>
+        <p>Disconnect power before changing any connection. Use only a supported current-limited regulated DC supply. Outputs are intended for a powered speaker, amplifier, or audio interface input, never a bare low-impedance speaker. Confirm breadboard rail continuity and polarized capacitor orientation before power-up.</p>
         <div id="hardware-sources" class="hardware-sources"></div>
       </section>
     </section>
@@ -309,5 +312,10 @@
     <p id="catalog-picker-help" class="catalog-picker-help">Choose a supported item. Exact pinouts and ratings still require verification.</p>
     <div id="catalog-picker-results" class="catalog-picker-results"></div>
   </dialog>
+  <aside id="engineering-help" class="engineering-help" aria-labelledby="engineering-help-title" hidden>
+    <header><div><span>Sound engineering help</span><h2 id="engineering-help-title">Circuit advice</h2></div><button id="close-engineering-help" type="button" aria-label="Close help">×</button></header>
+    <div id="engineering-help-content" class="engineering-help-content"></div>
+    <footer><button id="help-previous" type="button" aria-label="Previous advice">←</button><span id="help-position">1 / 1</span><button id="help-next" type="button" aria-label="Next advice">→</button></footer>
+  </aside>
 </body>
 </html>
