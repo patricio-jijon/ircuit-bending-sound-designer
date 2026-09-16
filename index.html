@@ -5,17 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=17">
-  <script src="hardware-data.js?v=17" defer></script>
-  <script src="devices-data.js?v=17" defer></script>
-  <script src="app.js?v=17" defer></script>
+  <link rel="stylesheet" href="styles.css?v=18">
+  <script src="hardware-data.js?v=18" defer></script>
+  <script src="devices-data.js?v=18" defer></script>
+  <script src="app.js?v=18" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
 
   <header class="app-header">
     <a class="brand" href="#studio" aria-label="Circuit Bending Sound Designer home">
-      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21"/><path d="M8 13h7v-4h6v4h6v-4h6v4h7M8 35h7v4h6v-4h6v4h6v-4h7"/><rect x="13" y="14" width="22" height="20" rx="2"/><path d="M21 14q3 5 6 0"/><text x="24" y="27" text-anchor="middle">555</text><path class="pulse" d="M7 28h5v-7h5v7h5"/></svg></span>
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="29"/><path d="M9 16h9v-5h8v5h12v-5h8v5h9M9 48h9v5h8v-5h12v5h8v-5h9"/><rect x="17" y="18" width="30" height="28" rx="3"/><path d="M27 18q5 7 10 0"/><text x="32" y="34" text-anchor="middle">555</text><path id="logo-wave" class="pulse" d="M7 39L14 39L18 31L23 43L29 27L35 39L41 34L47 39L57 39"/></svg></span>
       <span><strong>Circuit Bending</strong><small>Sound Designer</small></span>
     </a>
     <nav class="tabs" aria-label="Application views">
@@ -45,6 +45,10 @@
         </aside>
 
         <div class="workspace">
+          <section class="macro-panel" aria-labelledby="macro-panel-title">
+            <header><div><span class="section-number">MIDI</span><h2 id="macro-panel-title">8 assignable macro controls</h2></div><button id="midi-learn-toggle" type="button" aria-pressed="false"><kbd>⌘ M</kbd> MIDI learn</button><output id="midi-learn-status" aria-live="polite">Learn mode off</output></header>
+            <div id="macro-knobs" class="macro-knobs"></div>
+          </section>
           <section class="source-strip" aria-labelledby="source-title">
             <div>
               <span class="section-number">02</span>
@@ -72,7 +76,7 @@
               <div class="transport-controls"><button id="sequencer-start" type="button">▶ Start</button><button id="sequencer-stop" type="button">■ Stop</button><output id="sequencer-status" aria-live="polite">Stopped · step 1</output></div>
             </header>
             <div class="synth-control-strip">
-              <label for="synth-profile">Voice<select id="synth-profile"><option value="werkstatt">Moog Werkstatt-style</option><option value="monotron">Korg monotron-style</option><option value="microbrute">Arturia MicroBrute-style</option><option value="yamaha-fm">Yamaha FM-style</option><option value="casio-pcm">Casio PCM-style</option></select></label>
+              <label for="synth-profile">Voice<select id="synth-profile"><option value="osc-555">555 pulse oscillator</option><option value="werkstatt">Moog Werkstatt lead</option><option value="moog-bass">Moog ladder bass</option><option value="monotron">Korg monotron lead</option><option value="korg-delay">Korg delay dub</option><option value="microbrute">Arturia MicroBrute</option><option value="yamaha-fm">Yamaha FM bell</option><option value="yamaha-bass">Yamaha FM bass</option><option value="casio-pcm">Casio PCM-style</option></select></label>
               <label for="synth-waveform">Wave<select id="synth-waveform"><option value="sawtooth">Saw</option><option value="square">Square</option><option value="triangle">Triangle</option><option value="sine">Sine</option></select></label>
               <label for="arp-mode">Arpeggiator<select id="arp-mode"><option value="pattern">Pattern</option><option value="up">Up</option><option value="down">Down</option><option value="random">Random</option><option value="glitch">Glitch</option></select></label>
               <label for="midi-bpm">MIDI tempo<input id="midi-bpm" type="number" min="30" max="300" value="120"><span>BPM</span></label>
@@ -80,6 +84,7 @@
               <label for="pattern-duration">Run time<input id="pattern-duration" type="number" min="0" max="5" step="0.25" value="0"><span>min · 0 loops</span></label>
               <label for="start-delay">Start<select id="start-delay"><option value="0">Now</option><option value="1">1 second</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="bars">After 2 bars</option></select></label>
             </div>
+            <div id="voice-parameter-knobs" class="voice-parameter-knobs" aria-label="Synth voice controls"></div>
             <section class="synth-keyboard-panel" aria-labelledby="synth-keyboard-title">
               <div><h3 id="synth-keyboard-title">Playable synth keyboard</h3><p>Press or hold a key to play the selected voice through the complete effect chain.</p></div>
               <div id="synth-keyboard" class="synth-keyboard" role="group" aria-label="Two-octave synthesizer keyboard"></div>
@@ -250,7 +255,7 @@
             <button type="button" role="tab" aria-selected="false" data-construction="connections">Connections</button>
             <button type="button" role="tab" aria-selected="false" data-construction="pinouts">Pinouts</button>
             <button type="button" role="tab" aria-selected="false" data-construction="assembly">Assembly</button>
-            <button type="button" role="tab" aria-selected="false" data-construction="synths">Synth references</button>
+            <button type="button" role="tab" aria-selected="false" data-construction="synths">Effect &amp; synth circuits</button>
           </div>
           <section id="construction-panel" class="construction-panel" aria-live="polite" style="--workspace-zoom:1"></section>
           <div class="canvas-footer"><span>Top view · power disconnected while editing</span><span>Connection table remains authoritative</span></div>
