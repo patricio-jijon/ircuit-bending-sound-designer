@@ -1,12 +1,12 @@
 :root {
   color-scheme: dark;
-  --bg: #24272b;
-  --surface: #2c3035;
-  --surface-2: #34393f;
-  --surface-3: #3d434a;
-  --line: #565e66;
-  --ink: #f7f8fa;
-  --muted: #b7bdc4;
+  --bg: #5b5f64;
+  --surface: #484c51;
+  --surface-2: #555a60;
+  --surface-3: #646a70;
+  --line: #777e85;
+  --ink: #ffffff;
+  --muted: #e0e3e6;
   --accent: #d8ff45;
   --accent-ink: #171a1d;
   --danger: #ff736b;
@@ -54,7 +54,7 @@ a { color: inherit; }
   grid-template-columns: 270px 1fr auto;
   align-items: center;
   border-bottom: 1px solid var(--line);
-  background: rgba(36, 39, 43, .96);
+  background: rgba(72, 76, 81, .97);
   backdrop-filter: blur(16px);
   padding: 0 22px;
 }
@@ -90,7 +90,7 @@ a { color: inherit; }
   stroke-linejoin: round;
   stroke-width: 1.8;
 }
-.brand-mark svg rect { fill: #2c3035; }
+.brand-mark svg rect { fill: #484c51; }
 .brand-mark svg text {
   fill: currentColor;
   stroke: none;
@@ -906,7 +906,7 @@ body,
 .construction-workspace,
 .build-mixer,
 .sound-chain-panel {
-  background: #202327;
+  background: #555a60;
 }
 
 .hardware-status,
@@ -914,7 +914,7 @@ body,
 .hardware-calculation,
 .calculation-box,
 .check-item {
-  background: #282c31;
+  background: #4f5459;
 }
 
 .source-strip,
@@ -923,7 +923,7 @@ body,
 .device-filters,
 .catalog-picker-tools,
 .catalog-picker-help {
-  background: #30353a;
+  background: #52575c;
 }
 
 .tab:hover,
@@ -936,14 +936,14 @@ body,
 .physical-pot:focus-visible,
 .component-menu-options button:hover,
 .component-menu-options button:focus-visible {
-  background: #3a4046;
+  background: #666c72;
 }
 
 .part-item.is-selected,
 .component-menu-options button[aria-checked="true"],
 .device-card.is-added,
 .construction-tabs button.is-active {
-  background: #3d444a;
+  background: #62686e;
 }
 
 .component-menu,
@@ -951,7 +951,7 @@ body,
 .effect-module,
 .physical-pot,
 .sound-stage {
-  background: #2c3035;
+  background: #484c51;
 }
 
 .formula,
@@ -960,7 +960,7 @@ body,
 .device-filters button,
 .selected-device button,
 .catalog-picker > header button {
-  background: #25292d;
+  background: #3f4348;
 }
 
 select,
@@ -968,7 +968,7 @@ input:not([type="range"]):not([type="file"]),
 textarea,
 .parts-search input {
   border-color: #626b74;
-  background: #202429;
+  background: #3d4146;
   color: #fff;
 }
 
@@ -988,7 +988,20 @@ textarea,
 .check-item p,
 .device-card p,
 .selected-device p {
-  color: #c7ccd2;
+  color: #f0f2f4;
+}
+
+body p,
+body label,
+body small,
+body .muted,
+body .fine-print,
+body .hardware-summary,
+body .planner-disclaimer,
+body .catalog-picker-help,
+body .hardware-status span,
+body .devices-status span {
+  color: #fff;
 }
 
 .technical-svg,
@@ -1013,6 +1026,6 @@ textarea,
 .browse-replacements { background: #263842; }
 
 @media (max-width: 760px) {
-  .app-header { background: rgba(36, 39, 43, .98); }
+  .app-header { background: rgba(72, 76, 81, .98); }
   .brand-mark { width: 42px; height: 42px; flex-basis: 42px; }
 }
