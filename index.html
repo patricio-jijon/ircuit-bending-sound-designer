@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=14">
-  <script src="hardware-data.js?v=14" defer></script>
-  <script src="devices-data.js?v=14" defer></script>
-  <script src="app.js?v=14" defer></script>
+  <link rel="stylesheet" href="styles.css?v=15">
+  <script src="hardware-data.js?v=15" defer></script>
+  <script src="devices-data.js?v=15" defer></script>
+  <script src="app.js?v=15" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -55,6 +55,7 @@
               <select id="source-select">
                 <option value="demo">Built-in riff</option>
                 <option value="tone">Test oscillator</option>
+                <option value="sequencer">Modular synth sequencer</option>
                 <option value="microphone">Microphone / guitar interface</option>
                 <option value="file">Audio file</option>
               </select>
@@ -65,10 +66,43 @@
             </div>
           </section>
 
+          <section class="modular-console" aria-labelledby="modular-console-title">
+            <header class="modular-console-header">
+              <div><span class="section-number">03</span><h2 id="modular-console-title">Modular synth + MIDI sequencer</h2></div>
+              <div class="transport-controls"><button id="sequencer-start" type="button">▶ Start</button><button id="sequencer-stop" type="button">■ Stop</button><output id="sequencer-status" aria-live="polite">Stopped · step 1</output></div>
+            </header>
+            <div class="synth-control-strip">
+              <label for="synth-profile">Voice<select id="synth-profile"><option value="werkstatt">Moog Werkstatt-style</option><option value="monotron">Korg monotron-style</option><option value="microbrute">Arturia MicroBrute-style</option><option value="yamaha-fm">Yamaha FM-style</option><option value="casio-pcm">Casio PCM-style</option></select></label>
+              <label for="synth-waveform">Wave<select id="synth-waveform"><option value="sawtooth">Saw</option><option value="square">Square</option><option value="triangle">Triangle</option><option value="sine">Sine</option></select></label>
+              <label for="arp-mode">Arpeggiator<select id="arp-mode"><option value="pattern">Pattern</option><option value="up">Up</option><option value="down">Down</option><option value="random">Random</option><option value="glitch">Glitch</option></select></label>
+              <label for="midi-bpm">MIDI tempo<input id="midi-bpm" type="number" min="30" max="300" value="120"><span>BPM</span></label>
+              <label for="step-division">Rate<select id="step-division"><option value="4">1/16</option><option value="2">1/8</option><option value="8">1/32</option></select></label>
+              <label for="pattern-duration">Run time<input id="pattern-duration" type="number" min="0" max="5" step="0.25" value="0"><span>min · 0 loops</span></label>
+              <label for="start-delay">Start<select id="start-delay"><option value="0">Now</option><option value="1">1 second</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="bars">After 2 bars</option></select></label>
+            </div>
+            <div class="performance-switches" aria-label="Live performance switches">
+              <button type="button" data-performance="repeat" aria-pressed="false">Repeat</button><button type="button" data-performance="freeze" aria-pressed="false">Freeze</button><button type="button" data-performance="randomize">Randomize</button><button type="button" data-performance="glitch">Glitch fill</button><button type="button" data-performance="mute" aria-pressed="false">Mute</button><button type="button" data-quick-effect="fuzz">+ Fuzz</button><button type="button" data-quick-effect="delay">+ Delay</button><button type="button" data-quick-effect="ladder">+ Ladder filter</button>
+            </div>
+            <div class="sequencer-layout">
+              <div class="pattern-editor">
+                <div class="bar-tabs" role="tablist" aria-label="Pattern bars"><button type="button" data-pattern-bar="0" aria-selected="true">Bar 1</button><button type="button" data-pattern-bar="1" aria-selected="false">Bar 2</button><span>Click a light to place one MIDI note per step.</span></div>
+                <div id="arp-grid" class="arp-grid" role="grid" aria-label="Two-bar MIDI note pattern"></div>
+                <div id="step-playhead" class="step-playhead" aria-hidden="true"></div>
+              </div>
+              <div class="midi-editor">
+                <label for="midi-pattern">MIDI note pattern</label>
+                <textarea id="midi-pattern" rows="7" spellcheck="false">C3 - E3 - G3 - B3 - C4 - G3 - E3 - | C3 D3 E3 G3 A3 G3 E3 D3</textarea>
+                <div><button id="apply-midi-pattern" type="button">Apply notes</button><button id="clear-midi-pattern" type="button">Clear</button></div>
+                <p>Use note names such as C3, F#3, or Bb3. A dash is a rest; the bar line separates the two bars.</p>
+                <code id="midi-message">MIDI: waiting · channel 1</code>
+              </div>
+            </div>
+          </section>
+
           <section class="signal-workbench" aria-labelledby="chain-title">
             <div class="workbench-header">
               <div>
-                <span class="section-number">03</span>
+                <span class="section-number">04</span>
                 <h2 id="chain-title">Signal chain</h2>
               </div>
               <div class="chain-actions">
@@ -209,6 +243,7 @@
             <button type="button" role="tab" aria-selected="false" data-construction="connections">Connections</button>
             <button type="button" role="tab" aria-selected="false" data-construction="pinouts">Pinouts</button>
             <button type="button" role="tab" aria-selected="false" data-construction="assembly">Assembly</button>
+            <button type="button" role="tab" aria-selected="false" data-construction="synths">Synth references</button>
           </div>
           <section id="construction-panel" class="construction-panel" aria-live="polite" style="--workspace-zoom:1"></section>
           <div class="canvas-footer"><span>Top view · power disconnected while editing</span><span>Connection table remains authoritative</span></div>
