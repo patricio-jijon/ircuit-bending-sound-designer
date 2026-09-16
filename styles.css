@@ -1,10 +1,10 @@
 :root {
   color-scheme: dark;
-  --bg: #5b5f64;
-  --surface: #484c51;
-  --surface-2: #555a60;
-  --surface-3: #646a70;
-  --line: #777e85;
+  --bg: #707274;
+  --surface: #626466;
+  --surface-2: #6b6d70;
+  --surface-3: #777a7d;
+  --line: #909396;
   --ink: #ffffff;
   --muted: #e0e3e6;
   --accent: #d8ff45;
@@ -54,7 +54,7 @@ a { color: inherit; }
   grid-template-columns: 270px 1fr auto;
   align-items: center;
   border-bottom: 1px solid var(--line);
-  background: rgba(72, 76, 81, .97);
+  background: rgba(98, 100, 102, .98);
   backdrop-filter: blur(16px);
   padding: 0 22px;
 }
@@ -90,7 +90,7 @@ a { color: inherit; }
   stroke-linejoin: round;
   stroke-width: 1.8;
 }
-.brand-mark svg rect { fill: #484c51; }
+.brand-mark svg rect { fill: #626466; }
 .brand-mark svg text {
   fill: currentColor;
   stroke: none;
@@ -906,7 +906,7 @@ body,
 .construction-workspace,
 .build-mixer,
 .sound-chain-panel {
-  background: #555a60;
+  background: #686a6d;
 }
 
 .hardware-status,
@@ -914,7 +914,7 @@ body,
 .hardware-calculation,
 .calculation-box,
 .check-item {
-  background: #4f5459;
+  background: #5c5f62;
 }
 
 .source-strip,
@@ -923,7 +923,7 @@ body,
 .device-filters,
 .catalog-picker-tools,
 .catalog-picker-help {
-  background: #52575c;
+  background: #64676a;
 }
 
 .tab:hover,
@@ -936,14 +936,14 @@ body,
 .physical-pot:focus-visible,
 .component-menu-options button:hover,
 .component-menu-options button:focus-visible {
-  background: #666c72;
+  background: #797c7f;
 }
 
 .part-item.is-selected,
 .component-menu-options button[aria-checked="true"],
 .device-card.is-added,
 .construction-tabs button.is-active {
-  background: #62686e;
+  background: #74777a;
 }
 
 .component-menu,
@@ -951,7 +951,7 @@ body,
 .effect-module,
 .physical-pot,
 .sound-stage {
-  background: #484c51;
+  background: #626466;
 }
 
 .formula,
@@ -960,7 +960,7 @@ body,
 .device-filters button,
 .selected-device button,
 .catalog-picker > header button {
-  background: #3f4348;
+  background: #585a5d;
 }
 
 select,
@@ -968,7 +968,7 @@ input:not([type="range"]):not([type="file"]),
 textarea,
 .parts-search input {
   border-color: #626b74;
-  background: #3d4146;
+  background: #55585b;
   color: #fff;
 }
 
@@ -1004,6 +1004,17 @@ body .devices-status span {
   color: #fff;
 }
 
+body h1,
+body h2,
+body h3,
+body h4,
+.app-header,
+.brand,
+.brand-mark,
+.tabs .tab {
+  color: #fff;
+}
+
 .technical-svg,
 .part-icon,
 .selected-part-icon,
@@ -1026,6 +1037,6 @@ body .devices-status span {
 .browse-replacements { background: #263842; }
 
 @media (max-width: 760px) {
-  .app-header { background: rgba(72, 76, 81, .98); }
+  .app-header { background: rgba(98, 100, 102, .98); }
   .brand-mark { width: 42px; height: 42px; flex-basis: 42px; }
 }
