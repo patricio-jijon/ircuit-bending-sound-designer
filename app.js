@@ -209,6 +209,7 @@ const BASE_BOM = [
 ];
 
 const SYNTH_REFERENCES = [
+  { id:"ne555-oscillator", maker:"TI", name:"NE555 astable oscillator", status:"Official IC datasheet and calculated teaching circuit", source:"https://www.ti.com/lit/ds/symlink/ne555.pdf", blocks:["5-12 V DC","R1 charge path","R2 charge/discharge","Timing capacitor","NE555 threshold + discharge","Square-wave output"], note:"This functional circuit map follows the TI NE555 astable relationship. Exact breadboard construction remains available in the Oscillator circuit folder." },
   { id:"moog-werkstatt", maker:"Moog", name:"Werkstatt-01", status:"Manufacturer-published schematic", source:"https://api.moogmusic.com/sites/default/files/2020-11/Werkstatt_01_Manual_2020.pdf", blocks:["Keyboard CV / Gate","VCO","4-pole ladder VCF","VCA","LFO / EG","Audio out"], note:"Moog's official manual includes a schematic under its download agreement. This app shows an educational signal-flow summary and links to the original; it does not reproduce the schematic." },
   { id:"korg-monotron", maker:"Korg", name:"monotron", status:"Manufacturer-published schematic", source:"https://www.korg.com/us/support/download/others/0/311/1893/", blocks:["Ribbon CV / Gate","VCO","Resonant VCF","VCA","Headphone amp"], note:"Korg officially publishes the monotron schematic with license and warranty conditions. Open the source to view the authentic drawing." },
   { id:"korg-monotron-delay", maker:"Korg", name:"monotron DELAY", status:"Manufacturer-published schematic", source:"https://www.korg.com/us/support/download/product/0/116/", blocks:["Ribbon keyboard","VCO","MS-20-style VCF","LFO","Analog delay","Audio out"], note:"Korg publishes the complete monotron DELAY schematic. The app separates its oscillator, filter, LFO, delay, and output blocks for study without copying the protected drawing." },
@@ -237,6 +238,7 @@ const state = {
   sequencerStep: 0,
   sequencerRunning: false,
   keyboardNote: null,
+  selectedSynthReference: "ne555-oscillator",
   sequencePattern: [48,null,52,null,55,null,59,null,60,null,55,null,52,null,48,50,52,55,57,55,52,50,null,null,null,null,null,null,null,null,null,null],
   lastMidiMessage: "MIDI: waiting · channel 1",
   performance: { repeat:false, freeze:false, mute:false },
@@ -1905,8 +1907,24 @@ function assemblyTutorial(preset) {
   </div>`;
 }
 
+function synthBoardSvg(item) {
+  const count = item.blocks.length;
+  const step = count > 1 ? 730 / (count - 1) : 0;
+  const points = item.blocks.map((block,index)=>({block,x:85+index*step,y:index%2?215:145}));
+  const traces = points.slice(0,-1).map((point,index)=>{const next=points[index+1];return `<path d="M${point.x+55} ${point.y}H${(point.x+next.x)/2}V${next.y}H${next.x-55}" class="synth-board-trace"/><circle cx="${(point.x+next.x)/2}" cy="${next.y}" r="4" class="synth-board-via"/>`;}).join("");
+  const blocks = points.map((point,index)=>{
+    const compact = point.block.replace(/\s*\/.*/,"");
+    const shortLabel = compact.length > 15 ? `${compact.slice(0,14)}…` : compact;
+    const pins = Array.from({length:4},(_,pin)=>`<path d="M${point.x-35+pin*23} ${point.y-38}v-10M${point.x-35+pin*23} ${point.y+38}v10" class="synth-board-pin"/>`).join("");
+    return `<g class="synth-board-block"><title>${point.block}</title><rect x="${point.x-54}" y="${point.y-38}" width="108" height="76" rx="5"/><path d="M${point.x-10} ${point.y-38}q10 12 20 0" class="synth-board-notch"/>${pins}<text x="${point.x}" y="${point.y-4}" text-anchor="middle">${String(index+1).padStart(2,"0")}</text><text x="${point.x}" y="${point.y+15}" text-anchor="middle" class="synth-board-name">${shortLabel}</text></g>`;
+  }).join("");
+  const components = Array.from({length:18},(_,index)=>{const x=48+(index%9)*96,y=index<9?68:300;return index%3===0?`<g><path d="M${x-22} ${y}h10l5-7 10 14 10-14 5 7h10" class="synth-board-part"/><text x="${x}" y="${y-12}" text-anchor="middle">R${index+1}</text></g>`:`<g><path d="M${x-18} ${y}h14m8 0h14M${x-4} ${y-10}v20M${x+4} ${y-10}v20" class="synth-board-part"/><text x="${x}" y="${y-12}" text-anchor="middle">C${index+1}</text></g>`;}).join("");
+  return `<svg class="technical-svg synth-board-svg" viewBox="0 0 900 370" role="img" aria-label="${item.name} educational functional circuit board"><rect x="8" y="8" width="884" height="354" rx="7" class="synth-board-pcb"/><path d="M30 38H870M30 334H870" class="synth-board-rail"/><text x="34" y="31">+V</text><text x="34" y="352">GND</text>${components}${traces}${blocks}<text x="450" y="345" text-anchor="middle" class="synth-board-caption">EDUCATIONAL FUNCTIONAL MAP · NOT A PCB LAYOUT OR CONSTRUCTION SCHEMATIC</text></svg>`;
+}
+
 function synthReferenceView() {
-  return `<section id="construction-synths" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Manufacturer references</p><h2>Synth circuits and signal flow</h2></div><span>Official source status shown for every instrument</span></div><p class="synth-reference-boundary">Moog and Korg publish official schematic material under their download terms. Arturia, Yamaha, and Casio entries below are architecture references from official manuals; they are not presented as construction schematics.</p><div class="synth-reference-list">${SYNTH_REFERENCES.map((item)=>`<article class="synth-reference-card"><header><span>${item.maker}</span><h3>${item.name}</h3><b>${item.status}</b></header><div class="synth-flow">${item.blocks.map((block,index)=>`<span>${block}${index<item.blocks.length-1?`<i>→</i>`:""}</span>`).join("")}</div><p>${item.note}</p><a href="${item.source}" target="_blank" rel="noopener noreferrer">Open official manufacturer source ↗</a></article>`).join("")}</div></section>`;
+  const selected = SYNTH_REFERENCES.find((item)=>item.id===state.selectedSynthReference) || SYNTH_REFERENCES[0];
+  return `<section id="construction-synths" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Clickable circuit explorer</p><h2>Synth circuits and signal flow</h2></div><span>Select an instrument to display its circuit map</span></div><p class="synth-reference-boundary">Korg and Moog exact drawings remain at their official sources under manufacturer terms. The large in-app board is a functional educational map, not an invented PCB layout.</p><div class="synth-explorer"><nav class="synth-reference-list" aria-label="Synth circuit choices">${SYNTH_REFERENCES.map((item)=>`<button type="button" class="synth-reference-card${item.id===selected.id?" is-selected":""}" data-synth-reference="${item.id}" aria-pressed="${item.id===selected.id}"><span>${item.maker}</span><strong>${item.name}</strong><small>${item.status}</small></button>`).join("")}</nav><article class="synth-circuit-viewer"><header><div><span>${selected.maker}</span><h3>${selected.name}</h3></div><b>${selected.status}</b></header><div class="synth-board-wrap">${synthBoardSvg(selected)}</div><div class="synth-flow">${selected.blocks.map((block,index)=>`<span>${block}${index<selected.blocks.length-1?`<i>→</i>`:""}</span>`).join("")}</div><p>${selected.note}</p><a href="${selected.source}" target="_blank" rel="noopener noreferrer">View the exact official source ↗</a></article></div></section>`;
 }
 
 function renderConstruction() {
@@ -2406,6 +2424,13 @@ function bindEvents() {
     applyHardwareChoice(control.key, snappedControlValue(control, next));
   }, { passive: false });
   $("#construction-panel").addEventListener("click", (event) => {
+    const synthReference = event.target.closest("[data-synth-reference]");
+    if (synthReference) {
+      state.selectedSynthReference = synthReference.dataset.synthReference;
+      renderConstruction();
+      announce(`${SYNTH_REFERENCES.find((item)=>item.id===state.selectedSynthReference)?.name || "Synth"} circuit map selected.`);
+      return;
+    }
     const step = event.target.closest("[data-assembly-step]");
     if (step) { state.assemblyStep = Number(step.dataset.assemblyStep); renderConstruction(); return; }
     if (event.target.closest("[data-assembly-previous]")) { state.assemblyStep -= 1; renderConstruction(); return; }
