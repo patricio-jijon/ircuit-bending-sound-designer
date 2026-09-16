@@ -16,7 +16,12 @@ const [html, css, js, hardware, devices, readme] = await Promise.all([
 
 assert.match(html, /<title>Circuit Bending Sound Designer<\/title>/);
 assert.match(html, /class="brand-mark"[\s\S]*>555<\/text>/);
-assert.match(html, /app\.js\?v=14/);
+assert.match(html, /app\.js\?v=15/);
+assert.match(html, /id="modular-console-title"/);
+assert.match(html, /id="arp-grid"/);
+assert.match(html, /id="midi-bpm"/);
+assert.match(html, /data-performance="freeze"/);
+assert.match(html, /data-construction="synths"/);
 assert.match(html, /id="browse-circuits"/);
 assert.match(html, /id="supply-select"/);
 assert.match(html, /id="knob-style"/);
@@ -49,7 +54,7 @@ assert.match(html, /aria-live="polite"/);
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
 assert.equal(new Set(ids).size, ids.length, "HTML contains duplicate IDs");
 
-for (const moduleName of ["oscillator", "fuzz", "overdrive", "distortion", "octave", "delay", "glitch"]) {
+for (const moduleName of ["oscillator", "fuzz", "overdrive", "distortion", "octave", "delay", "glitch", "ladder", "korgfilter", "brute"]) {
   assert.match(js, new RegExp(`\\b${moduleName}: \\{`), `Missing ${moduleName} module`);
 }
 
@@ -73,6 +78,12 @@ assert.match(js, /function resistorBands/);
 assert.match(js, /resistor-band/);
 assert.match(js, /const ENGINEERING_HELP/);
 assert.match(js, /function renderEngineeringHelp/);
+assert.match(js, /function renderSequencer/);
+assert.match(js, /function startSequencerTransport/);
+assert.match(js, /function triggerSequenceStep/);
+assert.match(js, /const SYNTH_REFERENCES/);
+assert.match(js, /Manufacturer-published schematic/);
+assert.match(js, /function synthReferenceView/);
 assert.match(js, /function switchHardwareCircuit/);
 assert.match(js, /supplyScale/);
 assert.match(js, /knob-\$\{state\.knobStyle\}/);
@@ -93,7 +104,7 @@ assert.match(js, /addEventListener\("click", openComponentMenuFromClick\)/);
 assert.match(js, /Click, tap, or press Enter/);
 assert.match(js, /data-component-key/);
 assert.match(js, /Transistor model/);
-for (const section of ["schematic", "breadboard", "connections", "pinouts", "assembly"]) {
+for (const section of ["schematic", "breadboard", "connections", "pinouts", "assembly", "synths"]) {
   assert.match(js, new RegExp(`id="construction-${section}"`), `Missing visible ${section} section`);
 }
 assert.match(js, /loadHardwareSound\(\);[\s\S]*const initialView/);
@@ -115,6 +126,9 @@ assert.match(css, /\.sound-chain-panel/);
 assert.match(css, /\.engineering-help/);
 assert.match(css, /\.component-realistic \.resistor-body/);
 assert.match(css, /\.assembly-tutorial-layout/);
+assert.match(css, /\.modular-console/);
+assert.match(css, /\.arp-note-row/);
+assert.match(css, /\.synth-reference-card/);
 assert.match(readme, /GitHub Pages/);
 
 console.log("Static smoke tests passed: structure, modules, accessibility hooks, audio limiter, purchasing, and STL export.");
