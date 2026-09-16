@@ -187,7 +187,14 @@ const state = {
   plannerController: "uno-r4",
   selectedDeviceIds: [],
   deviceSearch: "",
-  deviceCategory: "All"
+  deviceCategory: "All",
+  deviceSubcategory: "All",
+  hardwarePartSubcategory: "All",
+  catalogPickerMode: "",
+  catalogPickerTarget: "",
+  catalogPickerSearch: "",
+  catalogPickerCategory: "All",
+  catalogPickerSubcategory: "All"
 };
 
 let audio = {
@@ -946,6 +953,7 @@ function renderHardwareControls() {
         ? `<select id="hardware-${control.key}" data-hardware-key="${control.key}">${control.options.map((option) => `<option value="${option.value}"${option.value === preset.values[control.key] ? " selected" : ""}>${option.label}</option>`).join("")}</select>`
         : `<input id="hardware-${control.key}" type="range" min="${control.min}" max="${control.max}" step="${control.step}" value="${preset.values[control.key]}" data-hardware-key="${control.key}"><div class="engineering-options" aria-label="Common values">${engineeringChoices(control).map((option) => `<button type="button" data-inspector-choice="${option.value}"${String(option.value) === String(preset.values[control.key]) ? ` aria-pressed="true"` : ""}>${option.label}</button>`).join("")}</div>`}
       <p class="inspector-note">${control.unit === "%" ? "This changes the control position during the behavioral simulation." : "Choose a supported value. The drawing, calculation, BOM, and sound target stay synchronized."}</p>
+      <button class="browse-replacements" type="button" data-browse-hardware="${state.hardwareSelectedIndex}">Browse illustrated replacements</button>
     </div>` : `<div class="locked-component"><strong>Fixed in this verified preset</strong><p>This part has no approved substitution in the current circuit model. Its identity, polarity, package, and rating remain locked so the audited wiring stays valid.</p></div>`;
   $("#hardware-controls").innerHTML = `<div class="selected-part-summary">
       <div class="selected-part-icon">${componentIcon(component?.kind || "dip8")}</div>
@@ -984,22 +992,106 @@ function hardwareCalculation(preset) {
   return `<span>Calculated RC estimate</span><strong>${rate.toFixed(1)} Hz</strong><code>f ≈ 1 / (2.2 × ${v.clockR} kΩ × ${v.clockC} µF)</code><p>CD40106 thresholds and part tolerances shift the physical rate.</p>`;
 }
 
+function hardwarePartSubcategory(component) {
+  const names = {breadboard:"Boards",dip8:"Integrated circuits",dip14:"Integrated circuits",resistor:"Resistors",capacitor:"Capacitors",electrolytic:"Capacitors",pot:"Potentiometers",diode:"Diodes",jack:"Connectors",supply:"Power"};
+  return names[component.kind] || "Other";
+}
+
+function deviceSubcategory(device) {
+  const byId = {
+    led:"Light output",button:"Switches",pot:"Analog controls",ldr:"Light sensors",tmp36:"Temperature",hcsr04:"Distance",dht22:"Environment",mpu6050:"Motion",
+    ssd1306:"OLED displays",ws2812:"Addressable LEDs",buzzer:"Sound output","i2s-mic":"Sound input",sg90:"Servos","dc-motor":"DC motors",stepper28:"Stepper motors",relay:"Relays",
+    mcp3008:"Analog conversion",sn74hc595:"Digital expansion",l293d:"Motor drivers",uln2003:"Load drivers",pca9685:"PWM expansion","level-shifter":"Logic translation",
+    ne555p:"Timers",tl072cp:"Amplifiers",cd40106be:"Schmitt logic"
+  };
+  return byId[device.id] || device.category;
+}
+
+function catalogIllustration(item, type = "device") {
+  if (type === "controller") {
+    const code = item.id.includes("arduino") || item.id.includes("uno") ? "UNO" : item.id.includes("raspberry-pi") ? "PI" : item.id.includes("pico") ? "PICO" : item.id.includes("teensy") ? "T4" : item.id.includes("esp32") ? "ESP" : "µBIT";
+    return `<div class="catalog-illustration board-art"><i></i><i></i><b>${code}</b><span></span></div>`;
+  }
+  const codes = {Basics:"R/C",Sensors:"SENSE",Displays:"DISPLAY",Sound:"AUDIO",Actuators:"MOTOR","Interface ICs":"IC","Driver ICs":"DRIVER","Interface Modules":"MODULE","Analog ICs":"ANALOG","Logic ICs":"LOGIC"};
+  return `<div class="catalog-illustration device-art category-${item.category?.toLowerCase().replaceAll(" ","-") || "part"}"><i></i><b>${codes[item.category] || item.kind?.toUpperCase() || "PART"}</b><span>${item.id?.slice(0,6).toUpperCase() || ""}</span></div>`;
+}
+
+function catalogPickerItems() {
+  if (state.catalogPickerMode === "controller") return window.DEVICE_CONTROLLERS.map((item) => ({...item,category:"Controller boards",subcategory:item.maker,model:`${item.logic} V logic · ${item.supply}`}));
+  if (state.catalogPickerMode === "device") return window.DEVICE_LIBRARY.map((item) => ({...item,subcategory:deviceSubcategory(item)}));
+  if (state.catalogPickerMode === "hardware") {
+    const preset = hardwarePreset();
+    const component = preset.components[Number(state.catalogPickerTarget)];
+    const control = preset.controls.find((item) => item.key === (component?.valueKey || state.hardwareSelectedKey));
+    if (!component || !control) return [];
+    return engineeringChoices(control).map((option) => ({id:String(option.value),value:option.value,name:component.name,model:option.label,category:hardwarePartSubcategory(component),subcategory:component.kind,kind:component.kind,note:choiceAvailability(control,option.value,preset.values[control.key]),controlKey:control.key}));
+  }
+  return [];
+}
+
+function renderCatalogPicker() {
+  const items = catalogPickerItems();
+  const categories = ["All", ...new Set(items.map((item) => item.category))];
+  if (!categories.includes(state.catalogPickerCategory)) state.catalogPickerCategory = "All";
+  const categoryItems = state.catalogPickerCategory === "All" ? items : items.filter((item) => item.category === state.catalogPickerCategory);
+  const subcategories = ["All", ...new Set(categoryItems.map((item) => item.subcategory))];
+  if (!subcategories.includes(state.catalogPickerSubcategory)) state.catalogPickerSubcategory = "All";
+  $("#catalog-picker-category").innerHTML = categories.map((name) => `<option value="${name}"${name === state.catalogPickerCategory ? " selected" : ""}>${name}</option>`).join("");
+  $("#catalog-picker-subcategory").innerHTML = subcategories.map((name) => `<option value="${name}"${name === state.catalogPickerSubcategory ? " selected" : ""}>${name}</option>`).join("");
+  const search = state.catalogPickerSearch.trim().toLowerCase();
+  const shown = categoryItems.filter((item) => (state.catalogPickerSubcategory === "All" || item.subcategory === state.catalogPickerSubcategory) && (!search || `${item.name} ${item.model || ""} ${item.category} ${item.subcategory} ${item.maker || ""}`.toLowerCase().includes(search)));
+  $("#catalog-picker-results").innerHTML = shown.map((item) => `<article class="catalog-result">${catalogIllustration(item,state.catalogPickerMode === "controller" ? "controller" : "device")}<div><span>${item.category} · ${item.subcategory}</span><h3>${item.name}</h3><p>${item.model || item.supply || ""}</p><small>${item.note || "Supported library item"}</small></div><button type="button" data-catalog-choice="${item.id}">${state.catalogPickerMode === "hardware" ? "Install" : "Choose"}</button></article>`).join("") || `<p class="empty-parts">No supported items match these filters.</p>`;
+}
+
+function openCatalogPicker(mode, target = "") {
+  state.catalogPickerMode = mode;
+  state.catalogPickerTarget = String(target);
+  state.catalogPickerSearch = "";
+  state.catalogPickerCategory = "All";
+  state.catalogPickerSubcategory = "All";
+  const titles = {controller:["Board library","Choose a controller board"],device:["Device library","Choose a replacement device"],hardware:["Component library","Choose a supported component value"]};
+  $("#catalog-picker-eyebrow").textContent = titles[mode][0];
+  $("#catalog-picker-title").textContent = titles[mode][1];
+  $("#catalog-picker-search").value = "";
+  renderCatalogPicker();
+  $("#catalog-picker").showModal();
+  $("#catalog-picker-search").focus();
+}
+
+function chooseCatalogItem(id) {
+  if (state.catalogPickerMode === "controller") {
+    state.plannerController = id;
+    renderDevicePlanner();
+  } else if (state.catalogPickerMode === "device") {
+    const index = state.selectedDeviceIds.indexOf(state.catalogPickerTarget);
+    if (index >= 0 && (!state.selectedDeviceIds.includes(id) || id === state.catalogPickerTarget)) state.selectedDeviceIds[index] = id;
+    renderDevicePlanner();
+  } else if (state.catalogPickerMode === "hardware") {
+    const item = catalogPickerItems().find((option) => option.id === id);
+    if (item) applyHardwareChoice(item.controlKey, item.value);
+  }
+  $("#catalog-picker").close();
+}
+
 function renderIllustratedBom() {
   const preset = hardwarePreset();
   let total = 0;
   let missingTotal = 0;
   const filter = state.partsFilter.trim().toLowerCase();
+  const subcategories = ["All", ...new Set(preset.components.map(hardwarePartSubcategory))];
+  $("#parts-subcategory").innerHTML = subcategories.map((name) => `<option value="${name}"${name === state.hardwarePartSubcategory ? " selected" : ""}>${name}</option>`).join("");
   const items = preset.components.map((component, index) => {
     total += component.qty * component.cost;
     const stock = inventoryMatch(component, preset);
-    const control = component.valueKey ? preset.controls.find((item) => item.key === component.valueKey) : null;
+    const componentRefs = component.ref.split(",").map((item) => item.trim());
+    const control = component.valueKey ? preset.controls.find((item) => item.key === component.valueKey) : preset.controls.find((item) => componentRefs.includes(item.ref));
     if (stock.missing) missingTotal += component.qty * component.cost;
     const searchText = `${component.ref} ${component.kind} ${component.name} ${componentValue(component, preset)}`.toLowerCase();
-    if (filter && !searchText.includes(filter)) return "";
+    if ((filter && !searchText.includes(filter)) || (state.hardwarePartSubcategory !== "All" && hardwarePartSubcategory(component) !== state.hardwarePartSubcategory)) return "";
     const selected = index === state.hardwareSelectedIndex;
     return `<article class="part-item${selected ? " is-selected" : ""}" role="button" tabindex="0" data-component-index="${index}"${control ? ` data-component-key="${control.key}"` : ""} data-component-ref="${component.ref}" aria-label="Inspect ${component.ref}, ${component.name}, ${componentValue(component, preset)}">
       <div class="part-icon">${componentIcon(component.kind)}</div>
-      <div><span>${component.ref} · qty ${component.qty}</span><strong>${component.name}</strong><p>${componentValue(component, preset)}</p><small>${control ? "Editable in this preset" : "Verified fixed part"}</small><span class="stock-badge ${stock.className}">${stock.label}</span></div>
+      <div><span>${component.ref} · qty ${component.qty}</span><strong>${component.name}</strong><p>${componentValue(component, preset)}</p><small>${hardwarePartSubcategory(component)} · ${control ? "editable" : "verified fixed part"}</small><span class="stock-badge ${stock.className}">${stock.label}</span>${control ? `<button class="part-change-button" type="button" data-hardware-change="${index}">Change</button>` : ""}</div>
     </article>`;
   });
   $("#illustrated-components").innerHTML = items.join("") || `<p class="empty-parts">No parts match “${state.partsFilter}”.</p>`;
@@ -1327,13 +1419,17 @@ function renderDevicePlanner() {
   $("#planner-library-count").textContent = `${window.DEVICE_CONTROLLERS.length} boards · ${window.DEVICE_LIBRARY.length} devices`;
   const categories = ["All", ...new Set(window.DEVICE_LIBRARY.map((item) => item.category))];
   $("#device-filters").innerHTML = categories.map((category) => `<button type="button" data-device-category="${category}"${state.deviceCategory === category ? ` aria-pressed="true"` : ""}>${category}</button>`).join("");
+  const categoryDevices = state.deviceCategory === "All" ? window.DEVICE_LIBRARY : window.DEVICE_LIBRARY.filter((item) => item.category === state.deviceCategory);
+  const subcategories = ["All", ...new Set(categoryDevices.map(deviceSubcategory))];
+  if (!subcategories.includes(state.deviceSubcategory)) state.deviceSubcategory = "All";
+  $("#device-subcategory").innerHTML = subcategories.map((name) => `<option value="${name}"${name === state.deviceSubcategory ? " selected" : ""}>${name}</option>`).join("");
   const search = state.deviceSearch.trim().toLowerCase();
-  const shown = window.DEVICE_LIBRARY.filter((device) => (state.deviceCategory === "All" || device.category === state.deviceCategory) && (!search || `${device.name} ${device.model} ${device.category} ${device.interfaces.join(" ")}`.toLowerCase().includes(search)));
+  const shown = window.DEVICE_LIBRARY.filter((device) => (state.deviceCategory === "All" || device.category === state.deviceCategory) && (state.deviceSubcategory === "All" || deviceSubcategory(device) === state.deviceSubcategory) && (!search || `${device.name} ${device.model} ${device.category} ${deviceSubcategory(device)} ${device.interfaces.join(" ")}`.toLowerCase().includes(search)));
   $("#device-catalog").innerHTML = shown.map((device) => {
     const added = state.selectedDeviceIds.includes(device.id);
-    return `<article class="device-card${added ? " is-added" : ""}"><div><span>${device.category}</span><h3>${device.name}</h3><p>${device.model}</p></div><div class="device-tags"><span>${device.logic === "passive" || device.logic === "analog" || device.logic === "load" || device.logic === "unknown" ? device.logic : `${device.logic} V logic`}</span>${device.interfaces.map((name) => `<span>${name.toUpperCase()}</span>`).join("")}</div><button type="button" data-device-add="${device.id}"${added ? " disabled" : ""}>${added ? "Added" : "Add"}</button></article>`;
+    return `<article class="device-card${added ? " is-added" : ""}">${catalogIllustration(device)}<div><span>${device.category} · ${deviceSubcategory(device)}</span><h3>${device.name}</h3><p>${device.model}</p></div><div class="device-tags"><span>${device.logic === "passive" || device.logic === "analog" || device.logic === "load" || device.logic === "unknown" ? device.logic : `${device.logic} V logic`}</span>${device.interfaces.map((name) => `<span>${name.toUpperCase()}</span>`).join("")}</div><button type="button" data-device-add="${device.id}"${added ? " disabled" : ""}>${added ? "Added" : "Add"}</button></article>`;
   }).join("") || `<p class="empty-parts">No supported devices match this filter.</p>`;
-  $("#selected-devices").innerHTML = devices.length ? devices.map((device, index) => `<article class="selected-device"><span>${String(index + 1).padStart(2,"0")}</span><div><h3>${device.name}</h3><p>${device.model} · ${device.supply || "Supply determined by circuit"}</p></div><button type="button" data-device-remove="${device.id}" aria-label="Remove ${device.name}">×</button></article>`).join("") : `<div class="empty-build"><strong>No devices selected</strong><p>Choose parts from the supported library to build a compatibility and connection plan.</p></div>`;
+  $("#selected-devices").innerHTML = devices.length ? devices.map((device, index) => `<article class="selected-device" data-selected-device="${device.id}" tabindex="0" aria-label="${device.name}. Ctrl-click or use Change to replace."><span>${String(index + 1).padStart(2,"0")}</span>${catalogIllustration(device)}<div><h3>${device.name}</h3><p>${device.model} · ${device.supply || "Supply determined by circuit"}</p></div><button class="selected-change" type="button" data-device-change="${device.id}">Change</button><button type="button" data-device-remove="${device.id}" aria-label="Remove ${device.name}">×</button></article>`).join("") : `<div class="empty-build"><strong>No devices selected</strong><p>Choose parts from the supported library to build a compatibility and connection plan.</p></div>`;
   const rows = devices.map((device) => {
     const connection = suggestedDeviceConnection(controller, device, devices);
     return `<tr><td><strong>${device.name}</strong></td><td>${connection.iface}</td><td>${connection.pins}</td><td>${connection.support}</td></tr>`;
@@ -1446,7 +1542,13 @@ function bindEvents() {
     state.partsFilter = event.target.value;
     renderIllustratedBom();
   });
+  $("#parts-subcategory").addEventListener("change", (event) => {
+    state.hardwarePartSubcategory = event.target.value;
+    renderIllustratedBom();
+  });
   $("#hardware-controls").addEventListener("click", (event) => {
+    const browse = event.target.closest("[data-browse-hardware]");
+    if (browse) return openCatalogPicker("hardware", browse.dataset.browseHardware);
     const choice = event.target.closest("[data-inspector-choice]");
     if (!choice) return;
     applyHardwareChoice(state.hardwareSelectedKey, choice.dataset.inspectorChoice);
@@ -1496,12 +1598,15 @@ function bindEvents() {
     const x = event.clientX || rect.left + Math.min(rect.width, 30);
     const y = event.clientY || rect.top + Math.min(rect.height, 30);
     openComponentMenu(component, x, y);
+    if (event.ctrlKey || event.metaKey) openCatalogPicker("hardware", state.hardwareSelectedIndex);
   };
   $("#construction-panel").addEventListener("click", openComponentMenuFromClick);
   $("#illustrated-components").addEventListener("click", (event) => {
     const component = event.target.closest("[data-component-index]");
     if (!component) return;
+    const change = event.target.closest("[data-hardware-change]");
     selectHardwarePart(Number(component.dataset.componentIndex), component.dataset.componentKey, component.dataset.componentRef);
+    if (change || event.ctrlKey || event.metaKey) openCatalogPicker("hardware", component.dataset.componentIndex);
   });
   $("#construction-panel").addEventListener("keydown", (event) => {
     const component = event.target.closest(".interactive-component");
@@ -1529,6 +1634,7 @@ function bindEvents() {
     state.plannerController = event.target.value;
     renderDevicePlanner();
   });
+  $("#browse-controllers").addEventListener("click", () => openCatalogPicker("controller"));
   $("#device-search").addEventListener("input", (event) => {
     state.deviceSearch = event.target.value;
     renderDevicePlanner();
@@ -1538,6 +1644,11 @@ function bindEvents() {
     const button = event.target.closest("[data-device-category]");
     if (!button) return;
     state.deviceCategory = button.dataset.deviceCategory;
+    state.deviceSubcategory = "All";
+    renderDevicePlanner();
+  });
+  $("#device-subcategory").addEventListener("change", (event) => {
+    state.deviceSubcategory = event.target.value;
     renderDevicePlanner();
   });
   $("#device-catalog").addEventListener("click", (event) => {
@@ -1548,7 +1659,10 @@ function bindEvents() {
     announce("Device added to the pre-build plan.");
   });
   $("#selected-devices").addEventListener("click", (event) => {
+    const selected = event.target.closest("[data-selected-device]");
+    const change = event.target.closest("[data-device-change]");
     const button = event.target.closest("[data-device-remove]");
+    if (change || (selected && (event.ctrlKey || event.metaKey))) return openCatalogPicker("device", selected.dataset.selectedDevice);
     if (!button) return;
     state.selectedDeviceIds = state.selectedDeviceIds.filter((id) => id !== button.dataset.deviceRemove);
     renderDevicePlanner();
@@ -1557,6 +1671,31 @@ function bindEvents() {
     state.selectedDeviceIds = [];
     renderDevicePlanner();
     announce("Pre-build selection cleared.");
+  });
+  $("#selected-devices").addEventListener("keydown", (event) => {
+    const selected = event.target.closest("[data-selected-device]");
+    if (!selected || !["Enter"," "].includes(event.key)) return;
+    event.preventDefault();
+    openCatalogPicker("device", selected.dataset.selectedDevice);
+  });
+  $("#catalog-picker-close").addEventListener("click", () => $("#catalog-picker").close());
+  $("#catalog-picker-search").addEventListener("input", (event) => {
+    state.catalogPickerSearch = event.target.value;
+    renderCatalogPicker();
+    $("#catalog-picker-search").focus();
+  });
+  $("#catalog-picker-category").addEventListener("change", (event) => {
+    state.catalogPickerCategory = event.target.value;
+    state.catalogPickerSubcategory = "All";
+    renderCatalogPicker();
+  });
+  $("#catalog-picker-subcategory").addEventListener("change", (event) => {
+    state.catalogPickerSubcategory = event.target.value;
+    renderCatalogPicker();
+  });
+  $("#catalog-picker-results").addEventListener("click", (event) => {
+    const choice = event.target.closest("[data-catalog-choice]");
+    if (choice) chooseCatalogItem(choice.dataset.catalogChoice);
   });
   $("#experiment-form").addEventListener("submit", (event) => {
     event.preventDefault();
