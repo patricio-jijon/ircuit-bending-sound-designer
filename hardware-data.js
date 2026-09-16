@@ -24,14 +24,16 @@ window.HARDWARE_PINOUTS = {
 window.HARDWARE_PRESETS = {
   dual555: {
     id: "dual555",
+    category: "Oscillators",
     guide: "guides/dual-555-drone-build-guide.pdf",
     name: "Dual 555 Drone",
     summary: "Two independently timed NE555P astable oscillators mixed to one line-level output.",
     chain: ["oscillator"],
     pinouts: ["NE555P"],
     color: "#71c7ff",
-    values: { r1: 10, r2: 22, r2b: 33, c: 10, mix: 34 },
+    values: { supply: 9, r1: 10, r2: 22, r2b: 33, c: 10, mix: 34 },
     controls: [
+      { key: "supply", ref: "PS1", label: "Regulated supply", unit: "V", type: "select", options: [{ value: 5, label: "5 V regulated" },{ value: 9, label: "9 V regulated" },{ value: 12, label: "12 V regulated" }], audio: { module: 0, key: "supply" } },
       { key: "r1", ref: "R1/R3", label: "Fixed timing resistors", unit: "kΩ", min: 1, max: 100, step: 1, audio: { module: 0, key: "r1" } },
       { key: "r2", ref: "P1", label: "Voice A pitch pot", unit: "kΩ", min: 1, max: 100, step: 1, audio: { module: 0, key: "r2" } },
       { key: "r2b", ref: "P2", label: "Voice B pitch pot", unit: "kΩ", min: 1, max: 100, step: 1, audio: { module: 0, key: "r2b" } },
@@ -50,7 +52,7 @@ window.HARDWARE_PRESETS = {
       { ref: "C5", kind: "electrolytic", name: "Electrolytic output capacitor", value: "1 µF, 25 V", qty: 1, cost: 0.20, query: "1uF 25V electrolytic capacitor", note: "Positive lead faces P3 wiper." },
       { ref: "C6", kind: "capacitor", name: "Supply bypass capacitor", value: "100 nF ceramic", qty: 1, cost: 0.12, query: "100nF ceramic capacitor", note: "Place close to U1/U2 supply pins." },
       { ref: "J1", kind: "jack", name: "6.35 mm mono output jack", value: "Panel mount", qty: 1, cost: 1.10, query: "quarter inch mono audio jack panel mount", note: "Tip is signal; sleeve is ground." },
-      { ref: "PS1", kind: "supply", name: "Regulated DC supply", value: "9 V, current-limited", qty: 1, cost: 9.50, query: "9V regulated guitar pedal power supply", note: "Do not use household mains on the breadboard." }
+      { ref: "PS1", kind: "supply", name: "Regulated DC supply", valueKey: "supply", qty: 1, cost: 9.50, query: "regulated variable DC bench supply current limited", note: "Use a current-limited 5–12 V DC source. Never connect household mains to the breadboard." }
     ],
     connections: [
       ["+9V", "BB1 + rail", "U1 VCC", "pin 8 · E10", "red", "Power"],
@@ -111,14 +113,16 @@ window.HARDWARE_PRESETS = {
 
   opampFuzz: {
     id: "opampFuzz",
+    category: "Distortion",
     guide: "guides/tl072-diode-fuzz-build-guide.pdf",
     name: "TL072 Diode Fuzz",
     summary: "A single-supply inverting gain stage with a buffered 4.5 V reference, feedback diodes, and RC tone filter.",
     chain: ["fuzz"],
     pinouts: ["TL072CP"],
     color: "#ff795f",
-    values: { rin: 10, rf: 470, toneC: 22, diode: "silicon", level: 58 },
+    values: { supply: 9, rin: 10, rf: 470, toneC: 22, diode: "silicon", level: 58 },
     controls: [
+      { key: "supply", ref: "PS1", label: "Regulated supply", unit: "V", type: "select", options: [{ value: 9, label: "9 V regulated" },{ value: 12, label: "12 V regulated" }], audio: { module: 0, key: "supply" } },
       { key: "rin", ref: "R3", label: "Input resistor", unit: "kΩ", min: 1, max: 100, step: 1, audio: { module: 0, key: "rin" } },
       { key: "rf", ref: "R4", label: "Feedback resistor", unit: "kΩ", min: 10, max: 1000, step: 10, audio: { module: 0, key: "rf" } },
       { key: "toneC", ref: "C4", label: "Tone capacitor", unit: "nF", min: 1, max: 220, step: 1, audio: { module: 0, key: "toneC" } },
@@ -145,7 +149,7 @@ window.HARDWARE_PRESETS = {
       { ref: "C5", kind: "capacitor", name: "Supply bypass capacitor", value: "100 nF ceramic", qty: 1, cost: 0.12, query: "100nF ceramic capacitor", note: "Close to U1 pins 8 and 4." },
       { ref: "P1", kind: "pot", name: "Bourns PTV09A-4020F-B104", value: "100 kΩ linear", qty: 1, cost: 1.65, query: "Bourns PTV09A 100k linear potentiometer", note: "Terminal 2 is the wiper; output level control." },
       { ref: "J1,J2", kind: "jack", name: "6.35 mm mono audio jack", value: "Panel mount", qty: 2, cost: 1.10, query: "quarter inch mono audio jack panel mount", note: "Tip signal, sleeve ground." },
-      { ref: "PS1", kind: "supply", name: "Regulated DC supply", value: "9 V, current-limited", qty: 1, cost: 9.50, query: "9V regulated guitar pedal power supply", note: "Center polarity must match your connector." }
+      { ref: "PS1", kind: "supply", name: "Regulated DC supply", valueKey: "supply", qty: 1, cost: 9.50, query: "regulated variable DC bench supply current limited", note: "The TL072CP lesson uses 9 V or 12 V single-supply operation. Center polarity must match the connector." }
     ],
     connections: [
       ["POWER", "+9V rail", "U1 V+", "pin 8 · E12", "red", "TL072 supply"],
@@ -204,14 +208,16 @@ window.HARDWARE_PRESETS = {
 
   glitchClock: {
     id: "glitchClock",
+    category: "Oscillators",
     guide: "guides/40106-glitch-clock-build-guide.pdf",
     name: "40106 Glitch Clock",
     summary: "A CD40106BE Schmitt-trigger RC oscillator producing a sharp, adjustable pulse tone.",
     chain: ["glitch"],
     pinouts: ["CD40106BE"],
     color: "#d7ff3f",
-    values: { clockR: 47, clockC: 0.1, depth: 76 },
+    values: { supply: 9, clockR: 47, clockC: 0.1, depth: 76 },
     controls: [
+      { key: "supply", ref: "PS1", label: "Regulated supply", unit: "V", type: "select", options: [{ value: 5, label: "5 V regulated" },{ value: 9, label: "9 V regulated" },{ value: 12, label: "12 V regulated" }], audio: { module: 0, key: "supply" } },
       { key: "clockR", ref: "P1", label: "Clock resistance", unit: "kΩ", min: 1, max: 500, step: 1, audio: { module: 0, key: "clockR" } },
       { key: "clockC", ref: "C1", label: "Clock capacitance", unit: "µF", min: 0.01, max: 1, step: 0.01, audio: { module: 0, key: "clockC" } },
       { key: "depth", ref: "P2", label: "Output level / glitch depth", unit: "%", min: 0, max: 100, step: 1, audio: { module: 0, key: "depth" } }
@@ -227,7 +233,7 @@ window.HARDWARE_PRESETS = {
       { ref: "C3", kind: "capacitor", name: "Supply bypass capacitor", value: "100 nF ceramic", qty: 1, cost: 0.12, query: "100nF ceramic capacitor", note: "Place at pins 14 and 7." },
       { ref: "P2", kind: "pot", name: "Bourns PTV09A-4020F-B104", value: "100 kΩ linear", qty: 1, cost: 1.65, query: "Bourns PTV09A 100k linear potentiometer", note: "Terminal 2 is the wiper; output level." },
       { ref: "J1", kind: "jack", name: "6.35 mm mono output jack", value: "Panel mount", qty: 1, cost: 1.10, query: "quarter inch mono audio jack panel mount", note: "Tip signal, sleeve ground." },
-      { ref: "PS1", kind: "supply", name: "Regulated DC supply", value: "9 V, current-limited", qty: 1, cost: 9.50, query: "9V regulated guitar pedal power supply", note: "3–12 V is within this lesson boundary; calculations assume 9 V." }
+      { ref: "PS1", kind: "supply", name: "Regulated DC supply", valueKey: "supply", qty: 1, cost: 9.50, query: "regulated variable DC bench supply current limited", note: "Use a current-limited 5–12 V DC source. CMOS switching thresholds and output swing follow the supply." }
     ],
     connections: [
       ["POWER", "+9V rail", "U1 VDD", "pin 14 · E10", "red", "Supply"],
