@@ -211,6 +211,9 @@ const BASE_BOM = [
 const SYNTH_REFERENCES = [
   { id:"moog-werkstatt", maker:"Moog", name:"Werkstatt-01", status:"Manufacturer-published schematic", source:"https://api.moogmusic.com/sites/default/files/2020-11/Werkstatt_01_Manual_2020.pdf", blocks:["Keyboard CV / Gate","VCO","4-pole ladder VCF","VCA","LFO / EG","Audio out"], note:"Moog's official manual includes a schematic under its download agreement. This app shows an educational signal-flow summary and links to the original; it does not reproduce the schematic." },
   { id:"korg-monotron", maker:"Korg", name:"monotron", status:"Manufacturer-published schematic", source:"https://www.korg.com/us/support/download/others/0/311/1893/", blocks:["Ribbon CV / Gate","VCO","Resonant VCF","VCA","Headphone amp"], note:"Korg officially publishes the monotron schematic with license and warranty conditions. Open the source to view the authentic drawing." },
+  { id:"korg-monotron-delay", maker:"Korg", name:"monotron DELAY", status:"Manufacturer-published schematic", source:"https://www.korg.com/us/support/download/product/0/116/", blocks:["Ribbon keyboard","VCO","MS-20-style VCF","LFO","Analog delay","Audio out"], note:"Korg publishes the complete monotron DELAY schematic. The app separates its oscillator, filter, LFO, delay, and output blocks for study without copying the protected drawing." },
+  { id:"korg-monotron-duo", maker:"Korg", name:"monotron DUO", status:"Manufacturer-published schematic", source:"https://www.korg.com/download/global/monotron_duo_schematic/monotron_DUO_sch.pdf", blocks:["Ribbon keyboard","VCO 1","VCO 2 / X-MOD","MS-20-style VCF","VCA","Audio out"], note:"The official public-release schematic documents two oscillators, cross modulation, filter, amplifier, and output stages. Use Korg's source for exact parts and connections." },
+  { id:"moog-matriarch", maker:"Moog", name:"Matriarch stereo delay", status:"Official architecture and operating manual", source:"https://api.moogmusic.com/sites/default/files/2020-09/Matriarch%20Dark%20Manual.pdf", blocks:["Four VCOs","Mixer","Stereo ladder VCF","Dual VCA","Dual BBD stereo delay","Main outputs"], note:"Moog documents two BBD-based analog delays after the VCAs, with time, spacing, feedback, mix, and clock synchronization. This is a signal-flow reference, not a reproduced service schematic." },
   { id:"arturia-microbrute", maker:"Arturia", name:"MicroBrute", status:"Official architecture manual · no public construction schematic used", source:"https://downloads.arturia.com/products/microbrute/manual/MicroBrute_Manual_EN.pdf", blocks:["VCO + wave shapers","Oscillator mixer","Steiner-Parker VCF","Brute feedback","VCA","ADSR / LFO / sequencer"], note:"The official manual documents a 100% analog voice path, multimode filter, modulation matrix, MIDI and 64-step sequencing. The app models those blocks behaviorally." },
   { id:"yamaha-modx", maker:"Yamaha", name:"MODX / MODX M", status:"Official MIDI and signal-flow manuals · digital architecture", source:"https://usa.yamaha.com/products/music_production/synthesizers/modx/downloads.html", blocks:["Keyboard / MIDI in","Arpeggiator","AWM2 / FM-X / AN-X engines","Motion sequencer","Effects","Audio / MIDI out"], note:"Yamaha documents MIDI clock, arpeggiator, tone-generator and sequencer routing. This is an architecture reference, not a service schematic." },
   { id:"casio-mzx", maker:"Casio", name:"MZ-X series", status:"Official user/MIDI documentation · digital architecture", source:"https://support.casio.com/en/support/download.php?cid=008&pid=1209", blocks:["Keys / pads / MIDI","Pattern recorder","Tone generator","Mixer","DSP effects","Audio / MIDI out"], note:"Casio publishes operating, pattern-recorder and MIDI documentation. No manufacturer construction schematic is represented here." }
@@ -233,6 +236,7 @@ const state = {
   sequencerBar: 0,
   sequencerStep: 0,
   sequencerRunning: false,
+  keyboardNote: null,
   sequencePattern: [48,null,52,null,55,null,59,null,60,null,55,null,52,null,48,50,52,55,57,55,52,50,null,null,null,null,null,null,null,null,null,null],
   lastMidiMessage: "MIDI: waiting · channel 1",
   performance: { repeat:false, freeze:false, mute:false },
@@ -386,15 +390,32 @@ function midiFrequency(note) {
   return 440 * Math.pow(2, (note - 69) / 12);
 }
 
-function patternText() {
-  return state.sequencePattern.map((note,index) => `${index === 16 ? "| " : ""}${note == null ? "-" : midiToName(note)}`).join(" ");
+function patternText(bar = 0) {
+  return state.sequencePattern.slice(bar * 16, bar * 16 + 16).map((note) => note == null ? "-" : midiToName(note)).join(" ");
+}
+
+function renderSynthKeyboard() {
+  const blackPitchClasses = new Set([1,3,6,8,10]);
+  let whiteIndex = 0;
+  const keys = [];
+  for (let note = 48; note <= 71; note += 1) {
+    const isBlack = blackPitchClasses.has(note % 12);
+    if (isBlack) {
+      keys.push(`<button type="button" class="piano-key piano-key-black" style="--key-left:${whiteIndex / 14 * 100}%" data-keyboard-note="${note}" aria-label="Play ${midiToName(note)}"><span>${midiToName(note)}</span></button>`);
+    } else {
+      keys.push(`<button type="button" class="piano-key piano-key-white" data-keyboard-note="${note}" aria-label="Play ${midiToName(note)}"><span>${midiToName(note)}</span></button>`);
+      whiteIndex += 1;
+    }
+  }
+  $("#synth-keyboard").innerHTML = keys.join("");
 }
 
 function renderSequencer() {
   const start = state.sequencerBar * 16;
   $("#arp-grid").innerHTML = `<div class="arp-step-numbers"><span></span>${Array.from({length:16},(_,index)=>`<b>${index + 1}</b>`).join("")}</div>${SEQUENCER_ROWS.map((note) => `<div class="arp-note-row" role="row"><span>${midiToName(note)}</span>${Array.from({length:16},(_,index)=>{const patternIndex=start+index;const active=state.sequencePattern[patternIndex]===note;return `<button type="button" role="gridcell" data-pattern-step="${patternIndex}" data-pattern-note="${note}" aria-pressed="${active}" aria-label="${midiToName(note)}, bar ${state.sequencerBar+1}, step ${index+1}"><i></i></button>`;}).join("")}</div>`).join("")}`;
   $$('[data-pattern-bar]').forEach((button)=>button.setAttribute("aria-selected",String(Number(button.dataset.patternBar)===state.sequencerBar)));
-  $("#midi-pattern").value = patternText();
+  $("#midi-pattern").value = patternText(0);
+  $("#midi-pattern-bar-2").value = patternText(1);
   updateSequencerPlayhead();
 }
 
@@ -407,10 +428,12 @@ function updateSequencerPlayhead() {
 }
 
 function applyMidiText() {
-  const tokens = $("#midi-pattern").value.replaceAll("|", " ").split(/[\s,]+/).filter(Boolean);
-  const pattern = tokens.slice(0,32).map((token) => token === "-" || /^rest$/i.test(token) ? null : noteNameToMidi(token));
-  while (pattern.length < 32) pattern.push(null);
-  state.sequencePattern = pattern;
+  const parseBar = (selector) => {
+    const notes = $(selector).value.split(/[\s,]+/).filter(Boolean).slice(0,16).map((token) => token === "-" || /^rest$/i.test(token) ? null : noteNameToMidi(token));
+    while (notes.length < 16) notes.push(null);
+    return notes;
+  };
+  state.sequencePattern = [...parseBar("#midi-pattern"), ...parseBar("#midi-pattern-bar-2")];
   renderSequencer();
   announce("Two-bar MIDI note pattern applied.");
 }
@@ -430,25 +453,7 @@ function triggerSequenceStep() {
   if (!state.sequencerRunning || !audio.sequencerVoice) return;
   if (state.performance.freeze) return;
   const note = sequenceNoteForStep(state.sequencerStep);
-  const { carrier, modulator, modGain, sub, envelope } = audio.sequencerVoice;
-  const time = audio.context.currentTime;
-  const frequency = note == null ? 0 : midiFrequency(note);
-  envelope.gain.cancelScheduledValues(time);
-  if (note == null || state.performance.mute) {
-    state.lastMidiMessage = "MIDI: Note Off · channel 1";
-    envelope.gain.setTargetAtTime(0, time, .006);
-  } else {
-    state.lastMidiMessage = `MIDI: Note On ${midiToName(note)} · note ${note} · velocity 100 · channel 1`;
-    carrier.frequency.setTargetAtTime(frequency, time, .008);
-    if (sub) sub.frequency.setTargetAtTime(frequency / 2, time, .008);
-    if (modulator) {
-      modulator.frequency.setTargetAtTime(frequency * 2, time, .008);
-      modGain.gain.setTargetAtTime(frequency * 1.4, time, .012);
-    }
-    envelope.gain.setValueAtTime(0.001, time);
-    envelope.gain.linearRampToValueAtTime(.18, time + .012);
-    envelope.gain.exponentialRampToValueAtTime(.035, time + Math.max(.06, sequenceIntervalMs() / 1000 * .82));
-  }
+  gateSynthNote(state.performance.mute ? null : note, sequenceIntervalMs() / 1000 * .72, "sequencer");
   updateSequencerPlayhead();
   if (!state.performance.repeat) state.sequencerStep = (state.sequencerStep + 1) % 32;
 }
@@ -798,6 +803,8 @@ function stopSource() {
   audio.sequenceStartTimer = null;
   audio.sequencerVoice = null;
   state.sequencerRunning = false;
+  state.keyboardNote = null;
+  $$('[data-keyboard-note]').forEach((key) => key.classList.remove("is-playing"));
   audio.sourceNodes.forEach((node) => {
     try { if (typeof node.stop === "function") node.stop(); } catch (_) { /* already stopped */ }
     try { node.disconnect(); } catch (_) { /* already disconnected */ }
@@ -808,6 +815,108 @@ function stopSource() {
     audio.stream = null;
   }
   if ($("#sequencer-status")) updateSequencerPlayhead();
+}
+
+function createSynthVoice() {
+  if (audio.sequencerVoice) return audio.sequencerVoice;
+  const ctx = audio.context;
+  const profile = SYNTH_PROFILES[state.synthProfile];
+  const carrier = ctx.createOscillator();
+  const envelope = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  carrier.type = state.synthWaveform || profile.wave;
+  carrier.frequency.value = 130.81;
+  envelope.gain.value = 0.0001;
+  filter.type = "lowpass";
+  filter.frequency.value = profile.cutoff;
+  filter.Q.value = profile.resonance;
+  carrier.connect(envelope);
+  let sub = null;
+  if (profile.sub) {
+    sub = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    sub.type = "square";
+    sub.frequency.value = 65.41;
+    subGain.gain.value = .28;
+    sub.connect(subGain); subGain.connect(envelope); sub.start();
+    audio.sourceNodes.push(sub, subGain);
+  }
+  let modulator = null;
+  let modGain = null;
+  if (profile.fm) {
+    modulator = ctx.createOscillator();
+    modGain = ctx.createGain();
+    modulator.type = "sine";
+    modulator.frequency.value = 261.63;
+    modGain.gain.value = 90;
+    modulator.connect(modGain); modGain.connect(carrier.frequency); modulator.start();
+    audio.sourceNodes.push(modulator, modGain);
+  }
+  if (profile.chorus) {
+    const chorus = ctx.createDelay(.03);
+    const chorusGain = ctx.createGain();
+    chorus.delayTime.value = .012;
+    chorusGain.gain.value = .35;
+    envelope.connect(chorus); chorus.connect(chorusGain); chorusGain.connect(filter);
+    audio.sourceNodes.push(chorus, chorusGain);
+  }
+  envelope.connect(filter); filter.connect(audio.sourceBus); carrier.start();
+  audio.sourceNodes.push(carrier, envelope, filter);
+  audio.sequencerVoice = { carrier, envelope, filter, sub, modulator, modGain };
+  return audio.sequencerVoice;
+}
+
+function gateSynthNote(note, gateSeconds = null, origin = "keyboard") {
+  if (!audio.sequencerVoice || !audio.context) return;
+  const { carrier, modulator, modGain, sub, envelope } = audio.sequencerVoice;
+  const time = audio.context.currentTime;
+  envelope.gain.cancelScheduledValues(time);
+  envelope.gain.setValueAtTime(Math.max(0.0001, envelope.gain.value), time);
+  if (note == null || state.performance.mute) {
+    envelope.gain.setTargetAtTime(0.0001, time, .008);
+    state.lastMidiMessage = `MIDI: Note Off · ${origin} · channel 1`;
+    return;
+  }
+  const frequency = midiFrequency(note);
+  carrier.frequency.setTargetAtTime(frequency, time, .006);
+  if (sub) sub.frequency.setTargetAtTime(frequency / 2, time, .006);
+  if (modulator) {
+    modulator.frequency.setTargetAtTime(frequency * 2, time, .006);
+    modGain.gain.setTargetAtTime(frequency * 1.4, time, .01);
+  }
+  envelope.gain.linearRampToValueAtTime(.18, time + .009);
+  envelope.gain.exponentialRampToValueAtTime(.11, time + .045);
+  if (gateSeconds != null) {
+    const releaseStart = time + Math.max(.055, gateSeconds - .025);
+    envelope.gain.setValueAtTime(.11, releaseStart);
+    envelope.gain.exponentialRampToValueAtTime(.0001, time + Math.max(.08, gateSeconds));
+  }
+  state.lastMidiMessage = `MIDI: Note On ${midiToName(note)} · note ${note} · velocity 100 · ${origin} · channel 1`;
+}
+
+async function startKeyboardNote(note) {
+  await ensureAudio();
+  if (state.source !== "sequencer" || !audio.sequencerVoice) {
+    stopSource();
+    state.source = "sequencer";
+    state.audioOn = true;
+    $("#source-select").value = "sequencer";
+    rebuildAudioGraph();
+    createSynthVoice();
+  }
+  state.keyboardNote = note;
+  gateSynthNote(note, null, "keyboard");
+  $$('[data-keyboard-note]').forEach((key) => key.classList.toggle("is-playing", Number(key.dataset.keyboardNote) === note));
+  $("#midi-message").textContent = state.lastMidiMessage;
+  syncAudioButtons();
+}
+
+function stopKeyboardNote(note) {
+  if (state.keyboardNote !== note) return;
+  state.keyboardNote = null;
+  gateSynthNote(null, null, "keyboard");
+  $$('[data-keyboard-note]').forEach((key) => key.classList.remove("is-playing"));
+  $("#midi-message").textContent = state.lastMidiMessage;
 }
 
 async function startSource() {
@@ -844,44 +953,7 @@ async function startSource() {
   }
   if (state.source === "sequencer") {
     const profile = SYNTH_PROFILES[state.synthProfile];
-    const carrier = ctx.createOscillator();
-    const envelope = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-    carrier.type = state.synthWaveform || profile.wave;
-    envelope.gain.value = .001;
-    filter.type = "lowpass";
-    filter.frequency.value = profile.cutoff;
-    filter.Q.value = profile.resonance;
-    carrier.connect(envelope);
-    let sub = null;
-    if (profile.sub) {
-      sub = ctx.createOscillator();
-      const subGain = ctx.createGain();
-      sub.type = "square";
-      subGain.gain.value = .28;
-      sub.connect(subGain); subGain.connect(envelope); sub.start();
-      audio.sourceNodes.push(sub, subGain);
-    }
-    let modulator = null;
-    let modGain = null;
-    if (profile.fm) {
-      modulator = ctx.createOscillator();
-      modGain = ctx.createGain();
-      modulator.type = "sine";
-      modulator.connect(modGain); modGain.connect(carrier.frequency); modulator.start();
-      audio.sourceNodes.push(modulator, modGain);
-    }
-    if (profile.chorus) {
-      const chorus = ctx.createDelay(.03);
-      const chorusGain = ctx.createGain();
-      chorus.delayTime.value = .012;
-      chorusGain.gain.value = .35;
-      envelope.connect(chorus); chorus.connect(chorusGain); chorusGain.connect(filter);
-      audio.sourceNodes.push(chorus, chorusGain);
-    }
-    envelope.connect(filter); filter.connect(audio.sourceBus); carrier.start();
-    audio.sourceNodes.push(carrier, envelope, filter);
-    audio.sequencerVoice = { carrier, envelope, filter, sub, modulator, modGain };
+    createSynthVoice();
     state.sequencerRunning = true;
     triggerSequenceStep();
     audio.sequenceTimer = window.setInterval(triggerSequenceStep, sequenceIntervalMs());
@@ -961,7 +1033,8 @@ function createModuleProcessor(instance) {
   const supplyScale = clamp(Number(p.supply || 9) / 9, 0.55, 1.34);
 
   if (instance.type === "oscillator") {
-    if (!p.hardwareOnly) input.connect(output);
+    if (!p.hardwareOnly || state.source === "sequencer") input.connect(output);
+    if (state.source === "sequencer") return { input, output, nodes };
     const result = calculateModule(instance);
     const frequency = clamp(result.frequency, 20, 12000);
     const toneGain = ctx.createGain();
@@ -2123,6 +2196,31 @@ function bindEvents() {
   });
   $("#apply-midi-pattern").addEventListener("click", applyMidiText);
   $("#clear-midi-pattern").addEventListener("click",()=>{state.sequencePattern=Array(32).fill(null);renderSequencer();announce("Two-bar MIDI pattern cleared.");});
+  $("#synth-keyboard").addEventListener("pointerdown", (event) => {
+    const key = event.target.closest("[data-keyboard-note]");
+    if (!key) return;
+    event.preventDefault();
+    key.setPointerCapture?.(event.pointerId);
+    startKeyboardNote(Number(key.dataset.keyboardNote));
+  });
+  const releasePointerKey = (event) => {
+    const key = event.target.closest("[data-keyboard-note]");
+    if (key) stopKeyboardNote(Number(key.dataset.keyboardNote));
+  };
+  $("#synth-keyboard").addEventListener("pointerup", releasePointerKey);
+  $("#synth-keyboard").addEventListener("pointercancel", releasePointerKey);
+  $("#synth-keyboard").addEventListener("keydown", (event) => {
+    const key = event.target.closest("[data-keyboard-note]");
+    if (!key || event.repeat || !["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    startKeyboardNote(Number(key.dataset.keyboardNote));
+  });
+  $("#synth-keyboard").addEventListener("keyup", (event) => {
+    const key = event.target.closest("[data-keyboard-note]");
+    if (!key || !["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    stopKeyboardNote(Number(key.dataset.keyboardNote));
+  });
   $(".performance-switches").addEventListener("click", (event) => {
     const performance=event.target.closest("[data-performance]");
     const quick=event.target.closest("[data-quick-effect]");
@@ -2133,7 +2231,7 @@ function bindEvents() {
     if(action==="glitch") return randomizePattern(true);
     state.performance[action]=!state.performance[action];
     performance.setAttribute("aria-pressed",String(state.performance[action]));
-    if(action==="mute" && audio.sequencerVoice) audio.sequencerVoice.envelope.gain.setTargetAtTime(state.performance.mute?0:.03,audio.context.currentTime,.008);
+    if(action==="mute" && audio.sequencerVoice && state.performance.mute) gateSynthNote(null, null, "mute");
   });
   $("#audio-file").addEventListener("change", async (event) => {
     const file = event.target.files[0];
@@ -2474,6 +2572,7 @@ function bindEvents() {
 }
 
 renderLibrary();
+renderSynthKeyboard();
 bindEvents();
 renderSequencer();
 renderHardware();
