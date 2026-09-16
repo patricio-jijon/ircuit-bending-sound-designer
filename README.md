@@ -38,6 +38,11 @@ GitHub will provide the public URL after deployment completes.
 - Device Planner with seven exact controller boards, twenty-five supported chips/devices, mixed-device selection, compatibility blockers, and suggested connection plans
 - Illustrated replacement browser with search, category and subcategory filters; opens from Change buttons or Ctrl-click on supported components
 - Direct component clicks open the matching replacement list; colored breadboard wires open a behavioral sound-stage library whose additions affect live browser audio
+- Realistic SVG parts include five-band 1% resistor colors derived from the installed value, package-style ICs, polarized electrolytics, film capacitors, diodes, supplies, and three selectable knob styles
+- Verified circuit folders group oscillator and distortion builds; 5 V, 9 V, and 12 V supply choices are limited by the selected circuit and synchronize calculations, labels, BOM values, and modeled output scale
+- Contextual engineering help opens on component hover or keyboard focus and provides paged advice for mixing, timing, filtering, clipping, polarity, headroom, and safe supply selection
+- Off-board potentiometers turn by pointer drag, mouse wheel, or arrow keys; a simple click opens illustrated, selectable values without confusing a drag for a selection
+- The Assembly tab is a guided Prepare → Place → Wire → Inspect → Test tutorial with progress, per-step checks, meter guidance, and safe off-board potentiometer-lug instructions adapted from the supplied construction references
 - Resistor, capacitor, potentiometer, diode-material, and transistor-model exploration controls
 - STEM Center inventory status for stocked, unverified, and additional-purchase parts, with separate purchase estimate
 - Breadboard, schematic, connections, pinouts, and assembly are focused workspace views rather than one long document
