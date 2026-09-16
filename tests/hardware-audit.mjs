@@ -14,11 +14,16 @@ assert.equal(Object.keys(window.HARDWARE_PRESETS).length, 3);
 for (const [key, preset] of Object.entries(window.HARDWARE_PRESETS)) {
   assert.equal(key, preset.id);
   assert(preset.name && preset.summary && preset.guide);
+  assert(["Oscillators", "Distortion"].includes(preset.category), `${key}: missing circuit folder`);
   assert(preset.controls.length >= 3);
   assert(preset.components.length >= 10);
   assert(preset.connections.length >= 7);
   assert(preset.assembly.length >= 8);
   assert(preset.sources.every(([, url]) => url.startsWith("https://")));
+  const supplyControl = preset.controls.find((control) => control.key === "supply");
+  assert(supplyControl?.type === "select", `${key}: supply selector missing`);
+  assert(supplyControl.options.every((option) => option.value >= 3.3 && option.value <= 12), `${key}: supply outside lesson boundary`);
+  assert(preset.components.some((component) => component.kind === "supply" && component.valueKey === "supply"), `${key}: supply component is not synchronized`);
   for (const control of preset.controls) {
     if (control.type === "select") {
       assert(control.options.some((option) => option.value === preset.values[control.key]), `${key}: invalid ${control.key} selection`);
