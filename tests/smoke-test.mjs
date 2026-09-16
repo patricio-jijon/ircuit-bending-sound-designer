@@ -15,7 +15,10 @@ const [html, css, js, hardware, devices, readme] = await Promise.all([
 ]);
 
 assert.match(html, /<title>Circuit Bending Sound Designer<\/title>/);
-assert.match(html, /app\.js\?v=10/);
+assert.match(html, /class="brand-mark"[\s\S]*>555<\/text>/);
+assert.match(html, /app\.js\?v=11/);
+assert.match(css, /Graphite engineering theme/);
+assert.match(css, /\.brand-mark svg circle/);
 assert.match(html, /id="devices" class="view devices-view"/);
 assert.match(html, /id="planner-controller"/);
 assert.match(html, /id="device-catalog"/);
