@@ -46,7 +46,7 @@ GitHub will provide the public URL after deployment completes.
 - Studio includes a two-bar, 32-step MIDI-style light grid, separate 16-step Bar 1 and Bar 2 note/rest editors, 30–300 BPM clock, 1/8–1/32 divisions, immediate/1–3 second/two-bar starts, 0–5 minute runs, pattern/up/down/random/glitch arpeggiation, and Repeat/Freeze/Mute performance switches
 - A two-octave black-and-white keyboard plays the selected synth voice through the complete movable effects chain; sequencer notes use explicit note-on/note-off gating and silence the chain oscillator's unrelated continuous drone
 - Studio modules now include behavioral Moog-style ladder, Korg monotron-style VCF, and Arturia-style Steiner/feedback filters; cards can be dragged or moved with directional controls while up/down changes the main effect amount
-- Circuit Builder includes official-source signal-flow references for Moog Werkstatt and Matriarch delay, Korg monotron/DUO/DELAY, Arturia MicroBrute, Yamaha MODX, and Casio MZ-X. Published schematics remain clearly separated from architecture-only references
+- Circuit Builder includes a clickable in-app circuit explorer for the NE555 oscillator, Moog Werkstatt and Matriarch delay, Korg monotron/DUO/DELAY, Arturia MicroBrute, Yamaha MODX, and Casio MZ-X. Selecting a tile displays a labeled functional board map and its official source; published schematics remain clearly separated from architecture-only references
 - Resistor, capacitor, potentiometer, diode-material, and transistor-model exploration controls
 - STEM Center inventory status for stocked, unverified, and additional-purchase parts, with separate purchase estimate
 - Breadboard, schematic, connections, pinouts, and assembly are focused workspace views rather than one long document
