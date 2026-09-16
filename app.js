@@ -194,7 +194,9 @@ const state = {
   catalogPickerTarget: "",
   catalogPickerSearch: "",
   catalogPickerCategory: "All",
-  catalogPickerSubcategory: "All"
+  catalogPickerSubcategory: "All",
+  hardwareBaseCount: 0,
+  selectedWireIndex: -1
 };
 
 let audio = {
@@ -940,6 +942,22 @@ function recordHardwareSnapshot() {
   updateUndoButtons();
 }
 
+function soundStageCategory(type) {
+  if (type === "oscillator") return "Generator";
+  if (["fuzz","overdrive","distortion"].includes(type)) return "Clipping";
+  if (type === "delay") return "Time effect";
+  if (type === "octave") return "Pitch effect";
+  return "Modulation";
+}
+
+function soundChainPanel() {
+  const stages = state.modules.map((instance, index) => {
+    const definition = MODULES[instance.type];
+    return `<div class="sound-stage" style="--stage-color:${definition.color}"><i></i><span><b>${index + 1}</b><strong>${definition.shortName}</strong><small>${instance.hardwareAdded ? "Added simulation stage" : "Preset source stage"}</small></span>${instance.hardwareAdded ? `<button type="button" data-remove-sound-stage="${instance.id}" aria-label="Remove ${definition.name}">×</button>` : ""}</div>`;
+  }).join("");
+  return `<section class="sound-chain-panel"><div><span>Behavioral sound chain</span><strong>${state.modules.length} active stage${state.modules.length === 1 ? "" : "s"}</strong></div><div class="sound-stage-list">${stages || `<p>No sound model loaded.</p>`}</div><button class="add-sound-stage" type="button" data-browse-sound-stages>Add a sound stage</button><p>Added stages change browser audio only. They do not alter the audited physical wiring.</p></section>`;
+}
+
 function renderHardwareControls() {
   const preset = hardwarePreset();
   const component = selectedHardwareComponent(preset);
@@ -958,7 +976,7 @@ function renderHardwareControls() {
   $("#hardware-controls").innerHTML = `<div class="selected-part-summary">
       <div class="selected-part-icon">${componentIcon(component?.kind || "dip8")}</div>
       <div><span>${component?.ref || "Preset"}</span><h3>${component?.name || preset.name}</h3><strong>${value}</strong><p>${component?.note || preset.summary}</p></div>
-    </div>${editor}<div class="hardware-calculation">${hardwareCalculation(preset)}</div>`;
+    </div>${editor}<div class="hardware-calculation">${hardwareCalculation(preset)}</div>${soundChainPanel()}`;
   $("#hardware-selection-status").textContent = component ? `${component.ref} selected · ${component.name}` : "Verified preset ready";
   updateUndoButtons();
 }
@@ -1019,6 +1037,7 @@ function catalogIllustration(item, type = "device") {
 function catalogPickerItems() {
   if (state.catalogPickerMode === "controller") return window.DEVICE_CONTROLLERS.map((item) => ({...item,category:"Controller boards",subcategory:item.maker,model:`${item.logic} V logic · ${item.supply}`}));
   if (state.catalogPickerMode === "device") return window.DEVICE_LIBRARY.map((item) => ({...item,subcategory:deviceSubcategory(item)}));
+  if (state.catalogPickerMode === "sound") return Object.entries(MODULES).map(([id,item]) => ({id,name:item.name,model:item.description,category:"Sound stages",subcategory:soundStageCategory(id),note:`Controls: ${item.params.map((param) => param.label).slice(0,4).join(", ")}`,kind:"sound"}));
   if (state.catalogPickerMode === "hardware") {
     const preset = hardwarePreset();
     const component = preset.components[Number(state.catalogPickerTarget)];
@@ -1049,9 +1068,10 @@ function openCatalogPicker(mode, target = "") {
   state.catalogPickerSearch = "";
   state.catalogPickerCategory = "All";
   state.catalogPickerSubcategory = "All";
-  const titles = {controller:["Board library","Choose a controller board"],device:["Device library","Choose a replacement device"],hardware:["Component library","Choose a supported component value"]};
+  const titles = {controller:["Board library","Choose a controller board"],device:["Device library","Choose a replacement device"],hardware:["Component library","Choose a supported component value"],sound:["Sound-stage library","Add a stage to the browser sound chain"]};
   $("#catalog-picker-eyebrow").textContent = titles[mode][0];
   $("#catalog-picker-title").textContent = titles[mode][1];
+  $("#catalog-picker-help").textContent = mode === "sound" ? "These stages immediately change browser audio. They are behavioral simulations and do not add unverified physical wiring." : mode === "hardware" ? "Only component values supported by this audited circuit location are installable." : "Choose from the supported library, then review the compatibility report before wiring.";
   $("#catalog-picker-search").value = "";
   renderCatalogPicker();
   $("#catalog-picker").showModal();
@@ -1069,6 +1089,8 @@ function chooseCatalogItem(id) {
   } else if (state.catalogPickerMode === "hardware") {
     const item = catalogPickerItems().find((option) => option.id === id);
     if (item) applyHardwareChoice(item.controlKey, item.value);
+  } else if (state.catalogPickerMode === "sound") {
+    addHardwareSoundStage(id);
   }
   $("#catalog-picker").close();
 }
@@ -1247,7 +1269,7 @@ function breadboardSvg(preset) {
     for (const y of [132,152,172,192,212,262,282,302,322,342]) holes += `<circle cx="${x}" cy="${y}" r="3.2" class="board-hole"/>`;
   }
   const letters = Object.entries({A:132,B:152,C:172,D:192,E:212,F:262,G:282,H:302,I:322,J:342}).map(([l,y])=>`<text x="20" y="${y+4}">${l}</text>`).join("");
-  const wires = preset.boardWires.map(([from,to,color]) => { const a=holePoint(from), b=holePoint(to); return `<path class="board-wire ${color}" d="M${a.x} ${a.y} C${a.x} ${(a.y+b.y)/2} ${b.x} ${(a.y+b.y)/2} ${b.x} ${b.y}"/><circle cx="${a.x}" cy="${a.y}" r="5" class="wire-end ${color}"/><circle cx="${b.x}" cy="${b.y}" r="5" class="wire-end ${color}"/>`; }).join("");
+  const wires = preset.boardWires.map(([from,to,color],index) => { const a=holePoint(from), b=holePoint(to), path=`M${a.x} ${a.y} C${a.x} ${(a.y+b.y)/2} ${b.x} ${(a.y+b.y)/2} ${b.x} ${b.y}`; return `<g class="interactive-wire${state.selectedWireIndex === index ? " is-selected" : ""}" data-wire-index="${index}" data-wire-ref="${from} → ${to}" role="button" tabindex="0" aria-label="Signal wire ${from} to ${to}. Click to add a sound stage."><title>${from} to ${to}: click to add a behavioral sound stage</title><path class="wire-hit" d="${path}"/><path class="board-wire ${color}" d="${path}"/><circle cx="${a.x}" cy="${a.y}" r="5" class="wire-end ${color}"/><circle cx="${b.x}" cy="${b.y}" r="5" class="wire-end ${color}"/></g>`; }).join("");
   const parts = preset.placements.map((part) => {
     if (part.kind.startsWith("dip")) {
       const pins = part.kind === "dip14" ? 7 : 4;
@@ -1273,7 +1295,7 @@ function renderConstruction() {
     return `<section class="pinout-section"><h3>${item.identity}</h3><p>${item.orientation}</p><div class="connection-table-wrap"><table class="connection-table pinout-table"><thead><tr><th>Pin</th><th>Name</th><th>Role in this component</th></tr></thead><tbody>${item.pins.map(([number,name,role])=>`<tr><td>${number}</td><td><strong>${name}</strong></td><td>${role}</td></tr>`).join("")}</tbody></table></div><a href="${item.source}" target="_blank" rel="noopener noreferrer">Open manufacturer source ↗</a></section>`;
   }).join("");
   const views = {
-    breadboard: `<section id="construction-breadboard" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Physical layout</p><h2>${preset.name} breadboard</h2></div><span>Select a labeled part to inspect it</span></div><div class="canvas-zoom-surface">${breadboardSvg(preset)}${renderPotControls(preset)}</div><p class="graphic-caption"><strong>Preset workspace:</strong> component values are editable; placement and wiring remain locked to the audited connection table in this version.</p></section>`,
+    breadboard: `<section id="construction-breadboard" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Physical layout</p><h2>${preset.name} breadboard</h2></div><span>Click a part to replace it · click a colored wire to add sound</span></div><div class="canvas-zoom-surface">${breadboardSvg(preset)}${renderPotControls(preset)}</div><p class="graphic-caption"><strong>Direct interaction:</strong> component lists change supported values. Wire clicks add behavioral sound stages; physical placement and wiring remain locked to the audited preset.</p></section>`,
     schematic: `<section id="construction-schematic" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Electrical view</p><h2>${preset.name} schematic</h2></div><span>Highlighted targets share the component inspector</span></div><div class="canvas-zoom-surface">${schematicSvg(preset)}</div><p class="graphic-caption"><strong>Calculated and browser-simulated:</strong> this is not a physically measured result.</p></section>`,
     connections: `<section id="construction-connections" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Authoritative netlist</p><h2>Wire-by-wire connections</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${row[0]}</strong></td><td>${row.slice(1,-2).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${row.at(-1)}</td></tr>`).join("")}</tbody></table></div></section>`,
     pinouts: `<section id="construction-pinouts" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Manufacturer sources</p><h2>Package orientation and pins</h2></div><span>Top view · confirm notch before power</span></div>${pinouts}</section>`,
@@ -1356,10 +1378,36 @@ function loadHardwareSound() {
   if (preset.id === "dual555") state.modules[0].params.voices = "dual";
   if (preset.id === "dual555" || preset.id === "glitchClock") state.modules[0].params.hardwareOnly = true;
   state.selectedId = state.modules[0]?.id ?? null;
+  state.hardwareBaseCount = state.modules.length;
   state.hardwareLoadedId = preset.id;
   renderStudio();
   rebuildAudioGraph();
   announce(`${preset.name} sound model connected. Press Start sound, then change a component.`);
+}
+
+async function addHardwareSoundStage(type) {
+  if (!MODULES[type]) return;
+  const instance = {id:nextId++,type,bypassed:false,params:freshParams(type),hardwareAdded:true};
+  state.modules.push(instance);
+  state.selectedId = instance.id;
+  rebuildAudioGraph();
+  renderChain();
+  renderInspector();
+  renderHardwareControls();
+  if (!state.audioOn) await toggleAudio();
+  announce(`${MODULES[type].name} added to the behavioral sound chain.`);
+}
+
+function removeHardwareSoundStage(id) {
+  const instance = state.modules.find((item) => item.id === id);
+  if (!instance?.hardwareAdded) return;
+  state.modules = state.modules.filter((item) => item.id !== id);
+  state.selectedId = state.modules[0]?.id ?? null;
+  rebuildAudioGraph();
+  renderChain();
+  renderInspector();
+  renderHardwareControls();
+  announce(`${MODULES[instance.type].name} removed from the behavioral sound chain.`);
 }
 
 function plannerController() {
@@ -1547,6 +1595,10 @@ function bindEvents() {
     renderIllustratedBom();
   });
   $("#hardware-controls").addEventListener("click", (event) => {
+    const addSound = event.target.closest("[data-browse-sound-stages]");
+    if (addSound) return openCatalogPicker("sound");
+    const removeSound = event.target.closest("[data-remove-sound-stage]");
+    if (removeSound) return removeHardwareSoundStage(Number(removeSound.dataset.removeSoundStage));
     const browse = event.target.closest("[data-browse-hardware]");
     if (browse) return openCatalogPicker("hardware", browse.dataset.browseHardware);
     const choice = event.target.closest("[data-inspector-choice]");
@@ -1592,13 +1644,21 @@ function bindEvents() {
   });
   const openComponentMenuFromClick = (event) => {
     if (event.target.closest("a")) return;
+    const wire = event.target.closest(".interactive-wire");
+    if (wire) {
+      state.selectedWireIndex = Number(wire.dataset.wireIndex);
+      $("#hardware-selection-status").textContent = `Wire ${wire.dataset.wireRef} selected · choose a behavioral sound stage`;
+      renderConstruction();
+      openCatalogPicker("sound", wire.dataset.wireIndex);
+      return;
+    }
     const component = event.target.closest(".interactive-component");
     if (!component) return;
     const rect = component.getBoundingClientRect();
     const x = event.clientX || rect.left + Math.min(rect.width, 30);
     const y = event.clientY || rect.top + Math.min(rect.height, 30);
     openComponentMenu(component, x, y);
-    if (event.ctrlKey || event.metaKey) openCatalogPicker("hardware", state.hardwareSelectedIndex);
+    openCatalogPicker("hardware", state.hardwareSelectedIndex);
   };
   $("#construction-panel").addEventListener("click", openComponentMenuFromClick);
   $("#illustrated-components").addEventListener("click", (event) => {
@@ -1609,11 +1669,18 @@ function bindEvents() {
     if (change || event.ctrlKey || event.metaKey) openCatalogPicker("hardware", component.dataset.componentIndex);
   });
   $("#construction-panel").addEventListener("keydown", (event) => {
-    const component = event.target.closest(".interactive-component");
-    if (!component || !["Enter", " ", "ContextMenu"].includes(event.key)) return;
+    const target = event.target.closest(".interactive-component, .interactive-wire");
+    if (!target || !["Enter", " ", "ContextMenu"].includes(event.key)) return;
     event.preventDefault();
-    const rect = component.getBoundingClientRect();
-    openComponentMenu(component, rect.left + Math.min(rect.width, 30), rect.top + Math.min(rect.height, 30));
+    if (target.matches(".interactive-wire")) {
+      state.selectedWireIndex = Number(target.dataset.wireIndex);
+      renderConstruction();
+      openCatalogPicker("sound", target.dataset.wireIndex);
+    } else {
+      const rect = target.getBoundingClientRect();
+      openComponentMenu(target, rect.left + Math.min(rect.width, 30), rect.top + Math.min(rect.height, 30));
+      openCatalogPicker("hardware", state.hardwareSelectedIndex);
+    }
   });
   $("#illustrated-components").addEventListener("keydown", (event) => {
     const component = event.target.closest("[data-component-index]");
