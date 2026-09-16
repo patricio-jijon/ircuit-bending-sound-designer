@@ -1,14 +1,14 @@
 :root {
   color-scheme: dark;
-  --bg: #111310;
-  --surface: #171a16;
-  --surface-2: #20241e;
-  --surface-3: #292e26;
-  --line: #3a4036;
-  --ink: #f1f3ea;
-  --muted: #a8afa0;
-  --accent: #d7ff3f;
-  --accent-ink: #151a08;
+  --bg: #24272b;
+  --surface: #2c3035;
+  --surface-2: #34393f;
+  --surface-3: #3d434a;
+  --line: #565e66;
+  --ink: #f7f8fa;
+  --muted: #b7bdc4;
+  --accent: #d8ff45;
+  --accent-ink: #171a1d;
   --danger: #ff736b;
   --focus: #71c7ff;
   --osc: #71c7ff;
@@ -19,7 +19,7 @@
   --delay: #55d7a1;
   --glitch: #f3f4e9;
   --header-height: 72px;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Aptos", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -54,7 +54,7 @@ a { color: inherit; }
   grid-template-columns: 270px 1fr auto;
   align-items: center;
   border-bottom: 1px solid var(--line);
-  background: rgba(17, 19, 16, .96);
+  background: rgba(36, 39, 43, .96);
   backdrop-filter: blur(16px);
   padding: 0 22px;
 }
@@ -68,26 +68,35 @@ a { color: inherit; }
   width: max-content;
 }
 
-.brand strong, .brand small { display: block; letter-spacing: 0; }
+.brand strong, .brand small { display: block; color: #fff; letter-spacing: 0; }
 .brand strong { font-size: .86rem; line-height: 1.2; }
-.brand small { color: var(--muted); font-size: .73rem; }
+.brand small { font-size: .73rem; }
 
 .brand-mark {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  align-items: end;
-  gap: 3px;
-  border: 1px solid #4a5144;
-  padding: 6px;
-  transform: rotate(-3deg);
+  width: 46px;
+  height: 46px;
+  display: block;
+  flex: 0 0 46px;
+  color: #fff;
 }
 
-.brand-mark i { display: block; background: var(--accent); }
-.brand-mark i:nth-child(1) { height: 55%; }
-.brand-mark i:nth-child(2) { height: 100%; }
-.brand-mark i:nth-child(3) { height: 72%; }
+.brand-mark svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.brand-mark svg circle,
+.brand-mark svg path,
+.brand-mark svg rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.brand-mark svg rect { fill: #2c3035; }
+.brand-mark svg text {
+  fill: currentColor;
+  stroke: none;
+  font: 800 8px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.brand-mark svg .pulse { stroke-width: 2.2; }
 
 .tabs { justify-self: center; display: flex; gap: 2px; }
 .tab {
@@ -867,4 +876,143 @@ td input { width: 76px; }
   .compatibility-panel { min-height: 480px; }
   .catalog-picker-tools { grid-template-columns: 1fr; }
   .catalog-picker-results { grid-template-columns: 1fr; }
+}
+
+/* Graphite engineering theme */
+body,
+.hardware-view,
+.devices-view {
+  background: var(--bg);
+}
+
+.app-header,
+.library,
+.inspector,
+.hardware-toolbar,
+.parts-drawer,
+.component-inspector,
+.devices-toolbar,
+.device-library,
+.compatibility-panel,
+.catalog-picker,
+.catalog-picker > header,
+.catalog-result,
+.hardware-notes,
+.controller-summary {
+  background: var(--surface);
+}
+
+.signal-workbench,
+.construction-workspace,
+.build-mixer,
+.sound-chain-panel {
+  background: #202327;
+}
+
+.hardware-status,
+.devices-status,
+.hardware-calculation,
+.calculation-box,
+.check-item {
+  background: #282c31;
+}
+
+.source-strip,
+.panel-heading,
+.workbench-panel-heading,
+.device-filters,
+.catalog-picker-tools,
+.catalog-picker-help {
+  background: #30353a;
+}
+
+.tab:hover,
+.module-add:hover,
+.part-item:hover,
+.part-item:focus-visible,
+.part-item.interactive-component:hover,
+.part-item.interactive-component:focus-visible,
+.physical-pot:hover,
+.physical-pot:focus-visible,
+.component-menu-options button:hover,
+.component-menu-options button:focus-visible {
+  background: #3a4046;
+}
+
+.part-item.is-selected,
+.component-menu-options button[aria-checked="true"],
+.device-card.is-added,
+.construction-tabs button.is-active {
+  background: #3d444a;
+}
+
+.component-menu,
+.component-menu-heading,
+.effect-module,
+.physical-pot,
+.sound-stage {
+  background: #2c3035;
+}
+
+.formula,
+.engineering-options button,
+.tool-button,
+.device-filters button,
+.selected-device button,
+.catalog-picker > header button {
+  background: #25292d;
+}
+
+select,
+input:not([type="range"]):not([type="file"]),
+textarea,
+.parts-search input {
+  border-color: #626b74;
+  background: #202429;
+  color: #fff;
+}
+
+.module-add,
+.tab,
+.part-item,
+.component-menu-options button,
+.device-card,
+.selected-device,
+.catalog-result,
+.check-item,
+.sound-stage {
+  color: #fff;
+}
+
+.catalog-result p,
+.check-item p,
+.device-card p,
+.selected-device p {
+  color: #c7ccd2;
+}
+
+.technical-svg,
+.part-icon,
+.selected-part-icon,
+.catalog-illustration {
+  border-color: #737d86;
+  background-color: #f4f6f2;
+}
+
+.scope-block { background: #111418; }
+.signal-chain::before,
+.effect-module::after { background: #737c84; }
+.component-menu { border-color: var(--focus); }
+.catalog-picker { border-color: #707982; }
+.catalog-picker::backdrop { background: rgba(18, 20, 23, .82); }
+.report-summary { background: #24352e; }
+.report-summary.has-stops { background: #3b2925; }
+.planner-safety,
+.safety-note { background: #352725; }
+.add-sound-stage { background: #30382a; }
+.browse-replacements { background: #263842; }
+
+@media (max-width: 760px) {
+  .app-header { background: rgba(36, 39, 43, .98); }
+  .brand-mark { width: 42px; height: 42px; flex-basis: 42px; }
 }
