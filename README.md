@@ -43,6 +43,9 @@ GitHub will provide the public URL after deployment completes.
 - Contextual engineering help opens on component hover or keyboard focus and provides paged advice for mixing, timing, filtering, clipping, polarity, headroom, and safe supply selection
 - Off-board potentiometers turn by pointer drag, mouse wheel, or arrow keys; a simple click opens illustrated, selectable values without confusing a drag for a selection
 - The Assembly tab is a guided Prepare → Place → Wire → Inspect → Test tutorial with progress, per-step checks, meter guidance, and safe off-board potentiometer-lug instructions adapted from the supplied construction references
+- Studio includes a two-bar, 32-step MIDI-style light grid, text note/rest editor, 30–300 BPM clock, 1/8–1/32 divisions, immediate/1–3 second/two-bar starts, 0–5 minute runs, pattern/up/down/random/glitch arpeggiation, and Repeat/Freeze/Mute performance switches
+- Studio modules now include behavioral Moog-style ladder, Korg monotron-style VCF, and Arturia-style Steiner/feedback filters; cards can be dragged or moved with directional controls while up/down changes the main effect amount
+- Circuit Builder includes official-source signal-flow references for Moog Werkstatt, Korg monotron, Arturia MicroBrute, Yamaha MODX, and Casio MZ-X. Only Moog and Korg are labeled as manufacturer-published schematic references; the other entries are architecture-only references
 - Resistor, capacitor, potentiometer, diode-material, and transistor-model exploration controls
 - STEM Center inventory status for stocked, unverified, and additional-purchase parts, with separate purchase estimate
 - Breadboard, schematic, connections, pinouts, and assembly are focused workspace views rather than one long document
