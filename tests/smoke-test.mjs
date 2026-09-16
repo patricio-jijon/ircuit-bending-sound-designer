@@ -16,7 +16,7 @@ const [html, css, js, hardware, devices, readme] = await Promise.all([
 
 assert.match(html, /<title>Circuit Bending Sound Designer<\/title>/);
 assert.match(html, /class="brand-mark"[\s\S]*>555<\/text>/);
-assert.match(html, /app\.js\?v=16/);
+assert.match(html, /app\.js\?v=17/);
 assert.match(html, /id="modular-console-title"/);
 assert.match(html, /id="synth-keyboard"/);
 assert.match(html, /id="midi-pattern-bar-2"/);
@@ -92,6 +92,10 @@ assert.match(js, /Manufacturer-published schematic/);
 assert.match(js, /monotron DELAY/);
 assert.match(js, /Matriarch stereo delay/);
 assert.match(js, /function synthReferenceView/);
+assert.match(js, /function synthBoardSvg/);
+assert.match(js, /data-synth-reference/);
+assert.match(js, /selectedSynthReference/);
+assert.match(js, /NE555 astable oscillator/);
 assert.match(js, /function switchHardwareCircuit/);
 assert.match(js, /supplyScale/);
 assert.match(js, /knob-\$\{state\.knobStyle\}/);
@@ -139,6 +143,8 @@ assert.match(css, /\.synth-keyboard/);
 assert.match(css, /\.piano-key-black/);
 assert.match(css, /\.arp-note-row/);
 assert.match(css, /\.synth-reference-card/);
+assert.match(css, /\.synth-board-svg/);
+assert.match(css, /\.synth-explorer/);
 assert.match(readme, /GitHub Pages/);
 
 console.log("Static smoke tests passed: structure, modules, accessibility hooks, audio limiter, purchasing, and STL export.");
