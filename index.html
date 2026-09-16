@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=7">
-  <script src="hardware-data.js?v=8" defer></script>
-  <script src="devices-data.js?v=8" defer></script>
-  <script src="app.js?v=8" defer></script>
+  <link rel="stylesheet" href="styles.css?v=9">
+  <script src="hardware-data.js?v=9" defer></script>
+  <script src="devices-data.js?v=9" defer></script>
+  <script src="app.js?v=9" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -195,6 +195,7 @@
         <aside class="parts-drawer" aria-labelledby="parts-drawer-title">
           <div class="workbench-panel-heading"><div><span class="section-number">Parts</span><h2 id="parts-drawer-title">Build components</h2></div><p>Select a part to inspect its identity, value, and role.</p></div>
           <label class="parts-search" for="parts-search"><span class="sr-only">Search components</span><input id="parts-search" type="search" placeholder="Search parts or references" autocomplete="off"></label>
+          <label class="subcategory-field" for="parts-subcategory"><span>Subcategory</span><select id="parts-subcategory"><option value="All">All circuit parts</option></select></label>
           <div id="illustrated-components" class="illustrated-components"></div>
           <div class="hardware-total"><div><span>Project</span><strong id="hardware-cost">$0.00</strong></div><div><span>To purchase</span><strong id="hardware-missing-cost">$0.00</strong></div></div>
         </aside>
@@ -224,7 +225,7 @@
     <section id="devices" class="view devices-view" aria-labelledby="devices-title" hidden>
       <header class="devices-toolbar">
         <div><span class="section-number">Pre-build compatibility</span><h1 id="devices-title">Device Planner</h1></div>
-        <label for="planner-controller"><span>Controller board</span><select id="planner-controller"></select></label>
+        <div class="controller-picker-field"><label for="planner-controller"><span>Controller board</span><select id="planner-controller"></select></label><button id="browse-controllers" type="button">Browse boards</button></div>
         <div class="planner-count"><span>Supported library</span><strong id="planner-library-count">0 devices</strong></div>
         <button id="planner-clear" class="secondary-button" type="button">Clear build</button>
       </header>
@@ -234,6 +235,7 @@
           <div class="workbench-panel-heading"><div><span class="section-number">Library</span><h2 id="device-library-title">Boards, chips, and devices</h2></div><p>This is the complete supported library. Exact unlisted modules still require their datasheet or a clear photo.</p></div>
           <label class="parts-search" for="device-search"><span class="sr-only">Search device library</span><input id="device-search" type="search" placeholder="Search sensor, motor, chip…" autocomplete="off"></label>
           <div id="device-filters" class="device-filters" aria-label="Device categories"></div>
+          <label class="subcategory-field" for="device-subcategory"><span>Subcategory</span><select id="device-subcategory"><option value="All">All subcategories</option></select></label>
           <div id="device-catalog" class="device-catalog"></div>
         </aside>
         <main class="build-mixer" aria-labelledby="build-mixer-title">
@@ -297,5 +299,15 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="component-menu" class="component-menu" role="menu" aria-label="Change component" hidden></div>
+  <dialog id="catalog-picker" class="catalog-picker" aria-labelledby="catalog-picker-title">
+    <header><div><span id="catalog-picker-eyebrow">Component library</span><h2 id="catalog-picker-title">Choose a replacement</h2></div><button id="catalog-picker-close" type="button" aria-label="Close component library">×</button></header>
+    <div class="catalog-picker-tools">
+      <label for="catalog-picker-search"><span>Search</span><input id="catalog-picker-search" type="search" placeholder="Search names, values, or models" autocomplete="off"></label>
+      <label for="catalog-picker-category"><span>Category</span><select id="catalog-picker-category"></select></label>
+      <label for="catalog-picker-subcategory"><span>Subcategory</span><select id="catalog-picker-subcategory"></select></label>
+    </div>
+    <p id="catalog-picker-help" class="catalog-picker-help">Choose a supported item. Exact pinouts and ratings still require verification.</p>
+    <div id="catalog-picker-results" class="catalog-picker-results"></div>
+  </dialog>
 </body>
 </html>
