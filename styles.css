@@ -1040,3 +1040,148 @@ body h4,
   .app-header { background: rgba(98, 100, 102, .98); }
   .brand-mark { width: 42px; height: 42px; flex-basis: 42px; }
 }
+
+/* Realistic component and sound-engineering controls */
+.circuit-picker-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 7px;
+  min-width: 0;
+}
+.circuit-picker-field .preset-field { min-width: 0; }
+.circuit-picker-field button,
+.help-button {
+  min-height: 38px;
+  border: 1px solid #fff;
+  background: transparent;
+  color: #fff;
+  padding: 7px 10px;
+  font-size: .62rem;
+  font-weight: 750;
+}
+.simulation-tools { flex-wrap: wrap; }
+.compact-field { display: grid; gap: 3px; }
+.compact-field span { color: #fff; font-size: .52rem; font-weight: 750; text-transform: uppercase; }
+.compact-field select { min-width: 92px; min-height: 34px; padding-block: 5px; font-size: .64rem; }
+
+.component-realistic .metal-lead,
+.component-realistic .pot-lugs,
+.component-realistic .ic-pin { fill: none !important; stroke: #9da4aa !important; stroke-width: 3 !important; }
+.component-realistic .resistor-body { fill: #d9bd82 !important; stroke: #725d38 !important; stroke-width: 1.4 !important; }
+.component-realistic .resistor-band { stroke: rgba(0,0,0,.24) !important; stroke-width: .6 !important; }
+.component-realistic .film-cap { fill: #e8b83e !important; stroke: #6f561d !important; }
+.component-realistic .electrolytic-body { fill: #20262b !important; stroke: #090b0d !important; }
+.component-realistic .electrolytic-stripe { fill: #d9dde0 !important; stroke: none !important; }
+.component-realistic .diode-body { fill: #cb7342 !important; stroke: #5f2b18 !important; }
+.component-realistic .diode-cathode { fill: #222 !important; stroke: none !important; }
+.component-realistic .pot-case { fill: #5a8f96 !important; stroke: #244a50 !important; }
+.component-realistic .pot-shaft { fill: #c6cbd0 !important; stroke: #596168 !important; }
+.component-realistic .pot-pointer { fill: none !important; stroke: #25292d !important; stroke-width: 2.5 !important; }
+.component-realistic .supply-case { fill: #2c3136 !important; stroke: #111417 !important; }
+.component-realistic .supply-terminals { fill: none !important; stroke: #f2f4f5 !important; }
+.component-realistic .ic-real-body { fill: #25282b !important; stroke: #0e1012 !important; }
+.component-realistic .ic-notch,
+.component-realistic .pin-one { fill: #596067 !important; stroke: #aab0b5 !important; }
+.component-realistic .ic-real-label { fill: #f2f4f5 !important; font-size: 7px !important; }
+
+.board-resistor-band { stroke: rgba(0,0,0,.25); stroke-width: .5; }
+.board-electrolytic { fill: #22282d; stroke: #0d1012; stroke-width: 1.4; }
+.board-electrolytic-stripe { fill: #d9dde0; stroke: none; }
+.board-polarity { fill: #c22; font: 800 12px ui-monospace, monospace; }
+.board-film-cap { fill: #e8b83e; stroke: #6f561d; stroke-width: 1.4; }
+.board-component-value { fill: #33270d; font: 800 7px ui-monospace, monospace; }
+.board-pin-one { fill: #f4f4ef; stroke: #6e7479; }
+
+.physical-knob { transition: background .16s ease, box-shadow .16s ease; }
+.physical-knob.knob-pointer { border-color: #aab0b5; background: #181b1e; box-shadow: inset 0 0 0 6px #353a3f; }
+.physical-knob.knob-skirted { border: 5px solid #22272b; background: #60666c; box-shadow: 0 0 0 3px #aab0b5, inset 0 0 0 5px #33383d; }
+.physical-knob.knob-aluminum { border-color: #d9dde0; background: linear-gradient(90deg,#8c9399,#e3e6e8 48%,#858c92); box-shadow: inset 0 0 0 4px #b9bec2; }
+.physical-knob.knob-aluminum i { background: #202428; }
+.physical-pot { cursor: ew-resize; touch-action: none; user-select: none; }
+.physical-pot:active .physical-knob { box-shadow: 0 0 0 3px #fff, inset 0 0 0 6px #353a3f; }
+
+.circuit-art { background: #f4f6f7; color: #22272b; }
+.circuit-art i:first-child { left: 9px; top: 11px; width: 44px; height: 2px; background: #4c6978; box-shadow: 0 10px #c45b42, 0 20px #4f8a66; }
+.circuit-art i:nth-child(2) { left: 26px; top: 6px; width: 18px; height: 34px; border: 2px solid #30363b; background: #fff; }
+.circuit-art b { color: #202428; }
+.circuit-art span { color: #4c555d; }
+.component-choice-art { display: grid; place-items: center; background: #f4f6f2; }
+.component-choice-art svg { width: 72px; height: 48px; }
+
+.engineering-help {
+  position: fixed;
+  z-index: 180;
+  right: 18px;
+  bottom: 18px;
+  width: min(370px, calc(100vw - 32px));
+  border: 1px solid #aeb3b7;
+  background: #45484b;
+  color: #fff;
+  box-shadow: 0 18px 60px rgba(0,0,0,.45);
+}
+.engineering-help[hidden] { display: none; }
+.engineering-help header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 14px; border-bottom: 1px solid #73777b; }
+.engineering-help header span { color: #fff; font: 750 .55rem ui-monospace, monospace; text-transform: uppercase; }
+.engineering-help h2 { margin: 3px 0 0; font-size: .96rem; }
+.engineering-help header button,
+.engineering-help footer button { width: 32px; height: 32px; border: 1px solid #aeb3b7; background: transparent; color: #fff; font-size: 1rem; }
+.engineering-help-content { padding: 16px 16px 18px; }
+.engineering-help-content p { margin: 0; color: #fff; font-size: .77rem; line-height: 1.55; }
+.engineering-help-content code { display: block; margin-top: 12px; padding: 9px; border-left: 2px solid #fff; background: #36393c; color: #fff; font-size: .68rem; white-space: normal; }
+.engineering-help-content small { display: block; margin-top: 12px; color: #e4e6e8; font-size: .57rem; }
+.engineering-help footer { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; border-top: 1px solid #73777b; }
+.engineering-help footer span { font: 700 .62rem ui-monospace, monospace; }
+
+.assembly-tutorial { border-top: 1px solid var(--line); }
+.assembly-progress { padding: 13px 15px; background: #55585b; }
+.assembly-progress > div:first-child { display: flex; justify-content: space-between; gap: 12px; color: #fff; font-size: .66rem; }
+.assembly-progress > div:first-child span { font-weight: 800; text-transform: uppercase; }
+.assembly-progress-track { height: 4px; margin-top: 9px; background: #383b3e; }
+.assembly-progress-track i { display: block; height: 100%; background: #fff; transition: width .2s ease; }
+.assembly-tutorial-layout { display: grid; grid-template-columns: 180px minmax(0,1fr); min-height: 430px; }
+.assembly-step-list { border-right: 1px solid var(--line); background: #5e6164; }
+.assembly-step-list button { width: 100%; min-height: 43px; display: grid; grid-template-columns: 28px 1fr 18px; align-items: center; gap: 6px; border: 0; border-bottom: 1px solid #777a7d; background: transparent; color: #fff; padding: 7px 10px; text-align: left; }
+.assembly-step-list button:hover,
+.assembly-step-list button[aria-current="step"] { background: #777a7d; }
+.assembly-step-list button[aria-current="step"] { box-shadow: inset 3px 0 #fff; }
+.assembly-step-list button span { font: 750 .58rem ui-monospace, monospace; }
+.assembly-step-list button b { font-size: .64rem; }
+.assembly-step-list button i { font-style: normal; text-align: center; }
+.assembly-step-list button.is-complete i { color: #fff; }
+.assembly-active-step { padding: 24px; background: #686a6d; }
+.assembly-active-step > h3 { max-width: 760px; margin: 7px 0 20px; font-size: 1.08rem; line-height: 1.45; }
+.assembly-phase-visual { position: relative; width: 108px; height: 58px; margin-bottom: 18px; border: 1px solid #fff; background: #f5f6f4; overflow: hidden; }
+.assembly-phase-visual span { position: absolute; left: 8px; top: 6px; color: #303438; font: 800 .62rem ui-monospace, monospace; }
+.assembly-phase-visual i { position: absolute; display: block; width: 18px; height: 18px; top: 28px; border: 2px solid #41474c; border-radius: 50%; }
+.assembly-phase-visual i:nth-of-type(1) { left: 13px; }
+.assembly-phase-visual i:nth-of-type(2) { left: 43px; }
+.assembly-phase-visual i:nth-of-type(3) { left: 73px; }
+.assembly-active-step section,
+.assembly-active-step aside { max-width: 760px; padding: 12px 0; border-top: 1px solid #85888b; }
+.assembly-active-step section strong,
+.assembly-active-step aside strong { display: block; color: #fff; font-size: .68rem; text-transform: uppercase; }
+.assembly-active-step section p,
+.assembly-active-step aside p { margin: 5px 0 0; color: #fff; font-size: .72rem; }
+.assembly-active-step aside { padding-left: 12px; border-left: 2px solid #fff; }
+.assembly-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 20px; }
+.assembly-actions button { min-height: 36px; border: 1px solid #fff; background: transparent; color: #fff; padding: 7px 11px; font-size: .66rem; font-weight: 750; }
+.assembly-actions .assembly-check { background: #fff; color: #303438; }
+.assembly-actions button:disabled { opacity: .35; }
+.assembly-source-note { margin: 0; padding: 12px 15px; border-top: 1px solid var(--line); color: #fff; font-size: .59rem; }
+
+@media (max-width: 1180px) {
+  .hardware-toolbar { grid-template-columns: minmax(160px,.7fr) minmax(260px,1fr) auto; }
+  .simulation-tools { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+@media (max-width: 650px) {
+  .circuit-picker-field { grid-template-columns: 1fr; }
+  .circuit-picker-field button { width: 100%; }
+  .engineering-help { right: 10px; bottom: 10px; width: calc(100vw - 20px); }
+  .assembly-tutorial-layout { grid-template-columns: 1fr; }
+  .assembly-step-list { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  .assembly-step-list button { flex: 0 0 100px; grid-template-columns: 24px 1fr; }
+  .assembly-step-list button i { display: none; }
+  .assembly-active-step { padding: 18px 14px; }
+}
