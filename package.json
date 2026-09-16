@@ -4,7 +4,7 @@
   "private": true,
   "description": "Interactive educational sound-effects and component laboratory",
   "scripts": {
-    "test": "node tests/smoke-test.mjs && node tests/hardware-audit.mjs && node tests/resistor-band-audit.mjs && node tests/device-planner-audit.mjs",
+    "test": "node tests/smoke-test.mjs && node tests/hardware-audit.mjs && node tests/resistor-band-audit.mjs && node tests/sequencer-audit.mjs && node tests/device-planner-audit.mjs",
     "start": "python -m http.server 8000"
   }
 }
