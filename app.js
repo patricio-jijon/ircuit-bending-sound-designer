@@ -199,6 +199,19 @@ const MODULES = {
   }
 };
 
+const EFFECT_CIRCUITS = [
+  {id:"effect-oscillator",moduleType:"oscillator",maker:"Studio circuit",name:"NE555 oscillator",status:"Calculated astable teaching circuit",blocks:["DC supply","R1 + pitch pot","Timing capacitor","NE555 thresholds","Square output","Level mix"]},
+  {id:"effect-fuzz",moduleType:"fuzz",maker:"Studio circuit",name:"Transistor / diode fuzz",status:"Interactive behavioral circuit study",blocks:["Input coupling","Gain stage","Clipping diodes","RC tone","Level"]},
+  {id:"effect-overdrive",moduleType:"overdrive",maker:"Studio circuit",name:"Soft-clipping overdrive",status:"Interactive behavioral circuit study",blocks:["Input high-pass","Op-amp gain","Feedback clipping","Wet / dry mix","Output"]},
+  {id:"effect-distortion",moduleType:"distortion",maker:"Studio circuit",name:"Hard-clipping distortion",status:"Interactive behavioral circuit study",blocks:["Input","Gain stage","Diode clipper","RC low-pass","Output"]},
+  {id:"effect-octave",moduleType:"octave",maker:"Studio circuit",name:"Full-wave octave",status:"Interactive behavioral circuit study",blocks:["Input coupling","Precision rectifier","Full-wave sum","DC block","Blend"]},
+  {id:"effect-delay",moduleType:"delay",maker:"Studio circuit",name:"Clocked delay",status:"Timing and feedback teaching model",blocks:["Input buffer","Clock","Delay memory","Feedback path","Wet / dry mix"]},
+  {id:"effect-glitch",moduleType:"glitch",maker:"Studio circuit",name:"40106 glitch gate",status:"Calculated Schmitt RC teaching circuit",blocks:["RC clock","Schmitt trigger","Pulse gate","Bit reduction","Mix"]},
+  {id:"effect-ladder",moduleType:"ladder",maker:"Studio circuit",name:"Four-pole ladder behavior",status:"Behavioral filter study · not Moog transistor schematic",blocks:["Input drive","Pole 1","Pole 2","Pole 3","Pole 4","Resonance feedback"]},
+  {id:"effect-korgfilter",moduleType:"korgfilter",maker:"Studio circuit",name:"Korg-style resonant VCF",status:"Behavioral filter study · official source linked separately",blocks:["Input","Drive","Two-pole VCF","Resonance","Wet / dry"]},
+  {id:"effect-brute",moduleType:"brute",maker:"Studio circuit",name:"Steiner-style multimode filter",status:"Behavioral filter study · official architecture reference",blocks:["Input","Mode selector","Multimode VCF","Feedback drive","Output"]}
+];
+
 const BASE_BOM = [
   ["Solderless breadboard, full size", 1, 8.50, "full size solderless breadboard"],
   ["Breadboard jumper wire kit", 1, 6.50, "breadboard jumper wire kit"],
@@ -227,8 +240,9 @@ const state = {
   audioOn: false,
   audioStarting: false,
   source: "demo",
-  synthProfile: "werkstatt",
-  synthWaveform: "sawtooth",
+  synthProfile: "osc-555",
+  synthWaveform: "square",
+  voiceParams: {cutoff:9000,resonance:1,attack:2,release:12,fmAmount:0,subMix:0},
   arpMode: "pattern",
   midiBpm: 120,
   stepDivision: 4,
@@ -238,10 +252,14 @@ const state = {
   sequencerStep: 0,
   sequencerRunning: false,
   keyboardNote: null,
-  selectedSynthReference: "ne555-oscillator",
+  selectedSynthReference: "effect-oscillator",
+  effectCircuitValues: Object.fromEntries(Object.keys(MODULES).map((type)=>[type,Object.fromEntries(MODULES[type].params.map((param)=>[param.key,param.value]))])),
   sequencePattern: [48,null,52,null,55,null,59,null,60,null,55,null,52,null,48,50,52,55,57,55,52,50,null,null,null,null,null,null,null,null,null,null],
   lastMidiMessage: "MIDI: waiting · channel 1",
   performance: { repeat:false, freeze:false, mute:false },
+  midiLearnMode: false,
+  activeMacro: null,
+  macros: Array.from({length:8},(_,index)=>({name:`Macro ${index+1}`,target:null,moduleId:null,paramKey:null,midiCc:null,value:64})),
   prices: {},
   hardwarePreset: "dual555",
   hardwareLoadedId: null,
@@ -289,7 +307,8 @@ let audio = {
   sequenceStartTimer: null,
   sequenceTimer: null,
   sequenceStopTimer: null,
-  sequencerVoice: null
+  sequencerVoice: null,
+  midiAccess: null
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -368,11 +387,29 @@ function showHelp(topic = "mixing", reset = true) {
 
 const SEQUENCER_ROWS = [72, 69, 67, 64, 60, 57, 55, 52];
 const SYNTH_PROFILES = {
-  werkstatt: { wave:"sawtooth", cutoff:1300, resonance:7, sub:true, label:"Moog Werkstatt-style behavioral voice" },
-  monotron: { wave:"sawtooth", cutoff:1900, resonance:10, sub:false, label:"Korg monotron-style behavioral voice" },
-  microbrute: { wave:"sawtooth", cutoff:2400, resonance:6, sub:true, label:"Arturia MicroBrute-style behavioral voice" },
-  "yamaha-fm": { wave:"sine", cutoff:6200, resonance:1, fm:true, label:"Yamaha FM-style behavioral voice" },
-  "casio-pcm": { wave:"triangle", cutoff:4800, resonance:2, chorus:true, label:"Casio PCM-style behavioral voice" }
+  "osc-555": { wave:"square", cutoff:9000, resonance:1, attack:2, release:12, fmAmount:0, subMix:0, label:"555 pulse oscillator behavioral voice" },
+  werkstatt: { wave:"sawtooth", cutoff:1300, resonance:7, attack:9, release:25, sub:true, subMix:28, fmAmount:0, label:"Moog Werkstatt-style behavioral voice" },
+  "moog-bass": { wave:"sawtooth", cutoff:680, resonance:12, attack:4, release:90, sub:true, subMix:48, fmAmount:0, label:"Moog ladder bass behavioral voice" },
+  monotron: { wave:"sawtooth", cutoff:1900, resonance:10, attack:5, release:35, subMix:0, fmAmount:0, label:"Korg monotron-style behavioral voice" },
+  "korg-delay": { wave:"square", cutoff:1350, resonance:14, attack:3, release:115, subMix:0, fmAmount:0, chorus:true, label:"Korg delay dub behavioral voice" },
+  microbrute: { wave:"sawtooth", cutoff:2400, resonance:6, attack:4, release:42, sub:true, subMix:22, fmAmount:0, label:"Arturia MicroBrute-style behavioral voice" },
+  "yamaha-fm": { wave:"sine", cutoff:6200, resonance:1, attack:2, release:180, fm:true, fmRatio:2, fmAmount:72, subMix:0, label:"Yamaha FM bell behavioral voice" },
+  "yamaha-bass": { wave:"sine", cutoff:3200, resonance:2, attack:3, release:65, fm:true, fmRatio:1, fmAmount:38, subMix:0, label:"Yamaha FM bass behavioral voice" },
+  "casio-pcm": { wave:"triangle", cutoff:4800, resonance:2, attack:6, release:120, fmAmount:0, subMix:0, chorus:true, label:"Casio PCM-style behavioral voice" }
+};
+
+const VOICE_PARAMETERS = [
+  {key:"cutoff",label:"Filter cutoff",unit:"Hz",min:80,max:12000,step:10},
+  {key:"resonance",label:"Resonance",unit:"Q",min:.1,max:20,step:.1},
+  {key:"attack",label:"Attack",unit:"ms",min:1,max:500,step:1},
+  {key:"release",label:"Release",unit:"ms",min:5,max:1000,step:1},
+  {key:"fmAmount",label:"FM amount",unit:"%",min:0,max:100,step:1},
+  {key:"subMix",label:"Sub mix",unit:"%",min:0,max:100,step:1}
+];
+
+const PRIMARY_PARAMETERS = {
+  oscillator:"r2", fuzz:"rf", overdrive:"drive", distortion:"drive", octave:"blend",
+  delay:"clockR2", glitch:"clockR", ladder:"cutoff", korgfilter:"cutoff", brute:"cutoff"
 };
 
 function midiToName(note) {
@@ -410,6 +447,43 @@ function renderSynthKeyboard() {
     }
   }
   $("#synth-keyboard").innerHTML = keys.join("");
+}
+
+function renderVoiceControls() {
+  $("#voice-parameter-knobs").innerHTML = VOICE_PARAMETERS.map((parameter)=>{
+    const value=Number(state.voiceParams[parameter.key] ?? parameter.min);
+    const angle=-135+(value-parameter.min)/(parameter.max-parameter.min)*270;
+    return `<label><span>${parameter.label}</span><button type="button" class="parameter-map-target voice-map-target" data-assign-voice-param="${parameter.key}">Map</button><span class="voice-dial" style="--voice-angle:${angle}deg"><i></i></span><input type="range" min="${parameter.min}" max="${parameter.max}" step="${parameter.step}" value="${value}" data-voice-param="${parameter.key}"><output>${Number(value.toFixed(1))} ${parameter.unit}</output></label>`;
+  }).join("");
+}
+
+function applySynthProfile(profileId) {
+  const profile=SYNTH_PROFILES[profileId];
+  state.synthProfile=profileId;
+  state.synthWaveform=profile.wave;
+  state.voiceParams=Object.fromEntries(VOICE_PARAMETERS.map((parameter)=>[parameter.key,profile[parameter.key] ?? parameter.min]));
+  $("#synth-waveform").value=state.synthWaveform;
+  renderVoiceControls();
+}
+
+function updateVoiceParameter(key,value) {
+  const parameter=VOICE_PARAMETERS.find((item)=>item.key===key);
+  if(!parameter) return;
+  state.voiceParams[key]=clamp(Number(value),parameter.min,parameter.max);
+  const voice=audio.sequencerVoice;
+  if(voice&&audio.context){
+    if(key==="cutoff") voice.filter.frequency.setTargetAtTime(state.voiceParams.cutoff,audio.context.currentTime,.01);
+    if(key==="resonance") voice.filter.Q.setTargetAtTime(state.voiceParams.resonance,audio.context.currentTime,.01);
+    if(key==="fmAmount"&&voice.modGain) voice.modGain.gain.setTargetAtTime((voice.carrier.frequency.value||110)*state.voiceParams.fmAmount/100,audio.context.currentTime,.01);
+    if(key==="subMix"&&voice.subGain) voice.subGain.gain.setTargetAtTime(state.voiceParams.subMix/100,audio.context.currentTime,.01);
+  }
+  const control=$(`[data-voice-param="${key}"]`);
+  if(control){
+    const dial=control.closest("label")?.querySelector(".voice-dial");
+    const output=control.closest("label")?.querySelector("output");
+    if(dial) dial.style.setProperty("--voice-angle",`${-135+(state.voiceParams[key]-parameter.min)/(parameter.max-parameter.min)*270}deg`);
+    if(output) output.textContent=`${Number(state.voiceParams[key].toFixed(1))} ${parameter.unit}`;
+  }
 }
 
 function renderSequencer() {
@@ -512,12 +586,14 @@ function addModule(type, select = true) {
   renderStudio();
   rebuildAudioGraph();
   announce(`${MODULES[type].name} added to the signal chain.`);
+  return instance;
 }
 
 function removeModule(id) {
   const index = state.modules.findIndex((item) => item.id === id);
   if (index < 0) return;
   const [removed] = state.modules.splice(index, 1);
+  state.macros.forEach((macro)=>{if(macro.target==="module"&&macro.moduleId===id){macro.target=null;macro.moduleId=null;macro.paramKey=null;}});
   if (state.selectedId === id) state.selectedId = state.modules[Math.min(index, state.modules.length - 1)]?.id ?? null;
   renderStudio();
   rebuildAudioGraph();
@@ -658,6 +734,115 @@ function renderLibrary() {
     </button>`).join("");
 }
 
+function macroAssignmentLabel(macro) {
+  if(macro.target==="voice") return `Voice · ${VOICE_PARAMETERS.find((item)=>item.key===macro.paramKey)?.label || macro.paramKey}`;
+  const instance = state.modules.find((item)=>item.id===macro.moduleId);
+  const definition = instance ? MODULES[instance.type] : null;
+  const parameter = definition?.params.find((item)=>item.key===macro.paramKey);
+  return instance && parameter ? `${definition.shortName} #${instance.id} · ${parameter.label}` : "Unassigned";
+}
+
+function renderMacroPanel() {
+  document.body.classList.toggle("midi-learn-mode", state.midiLearnMode);
+  $("#midi-learn-toggle").setAttribute("aria-pressed",String(state.midiLearnMode));
+  $("#midi-learn-status").textContent = state.midiLearnMode
+    ? `${state.activeMacro == null ? "Select a macro" : `Macro ${state.activeMacro+1} armed`} · choose a violet parameter or move a MIDI CC`
+    : "Learn mode off";
+  $("#macro-knobs").innerHTML = state.macros.map((macro,index)=>{
+    const active = state.activeMacro===index;
+    const angle = -135 + Number(macro.value) / 127 * 270;
+    return `<article class="macro-control${active?" is-armed":""}" data-macro-card="${index}"><button type="button" class="macro-select" data-macro-select="${index}" aria-pressed="${active}"><span>M${index+1}</span><small>${macro.midiCc==null?"CC --":`CC ${macro.midiCc}`}</small></button><label for="macro-${index}"><span class="macro-dial" style="--macro-angle:${angle}deg"><i></i></span><input id="macro-${index}" class="macro-range" type="range" min="0" max="127" value="${macro.value}" data-macro-value="${index}" aria-label="Macro ${index+1}, ${macroAssignmentLabel(macro)}"><strong>${macroAssignmentLabel(macro)}</strong></label></article>`;
+  }).join("");
+}
+
+function updateMappedModule(moduleId, paramKey, normalizedValue) {
+  const instance = state.modules.find((item)=>item.id===moduleId);
+  const parameter = instance ? MODULES[instance.type].params.find((item)=>item.key===paramKey) : null;
+  if (!instance || !parameter || parameter.type==="select") return;
+  const raw = parameter.min + clamp(normalizedValue,0,127) / 127 * (parameter.max-parameter.min);
+  const snapped = Math.round(raw / parameter.step) * parameter.step;
+  instance.params[paramKey] = clamp(Number(snapped.toFixed(6)),parameter.min,parameter.max);
+  renderChain();
+  if (state.selectedId===moduleId) renderInspector();
+  renderBom();
+  rebuildAudioGraph();
+}
+
+function setMacroValue(index,value) {
+  const macro = state.macros[index];
+  if (!macro) return;
+  macro.value = clamp(Number(value)||0,0,127);
+  if (macro.target==="module"&&macro.moduleId!=null) updateMappedModule(macro.moduleId,macro.paramKey,macro.value);
+  if (macro.target==="voice") {
+    const parameter=VOICE_PARAMETERS.find((item)=>item.key===macro.paramKey);
+    if(parameter) updateVoiceParameter(parameter.key,parameter.min+macro.value/127*(parameter.max-parameter.min));
+  }
+  const control=$(`[data-macro-value="${index}"]`);
+  if(control) control.value=macro.value;
+  const dial=control?.closest("label")?.querySelector(".macro-dial");
+  if(dial) dial.style.setProperty("--macro-angle",`${-135+macro.value/127*270}deg`);
+}
+
+function assignMacroToParameter(moduleId,paramKey) {
+  let index = state.activeMacro;
+  if (index==null) index = state.macros.findIndex((macro)=>macro.target==null);
+  if (index<0) index=0;
+  const macro=state.macros[index];
+  macro.target="module";
+  macro.moduleId=moduleId;
+  macro.paramKey=paramKey;
+  state.activeMacro=index;
+  const instance=state.modules.find((item)=>item.id===moduleId);
+  const parameter=instance && MODULES[instance.type].params.find((item)=>item.key===paramKey);
+  if (instance && parameter) macro.value=Math.round((Number(instance.params[paramKey])-parameter.min)/(parameter.max-parameter.min)*127);
+  renderMacroPanel(); renderChain(); renderInspector();
+  announce(`Macro ${index+1} assigned to ${macroAssignmentLabel(macro)}.`);
+}
+
+function assignMacroToVoice(paramKey) {
+  let index=state.activeMacro;
+  if(index==null) index=state.macros.findIndex((macro)=>macro.target==null);
+  if(index<0) index=0;
+  const macro=state.macros[index];
+  const parameter=VOICE_PARAMETERS.find((item)=>item.key===paramKey);
+  macro.target="voice"; macro.moduleId=null; macro.paramKey=paramKey;
+  macro.value=Math.round((state.voiceParams[paramKey]-parameter.min)/(parameter.max-parameter.min)*127);
+  state.activeMacro=index;
+  renderMacroPanel(); renderVoiceControls();
+  announce(`Macro ${index+1} assigned to ${macroAssignmentLabel(macro)}.`);
+}
+
+function handleMidiMessage(event) {
+  const [status,controller,value]=event.data;
+  if ((status&0xf0)!==0xb0) return;
+  if (state.midiLearnMode && state.activeMacro!=null) {
+    state.macros[state.activeMacro].midiCc=controller;
+    setMacroValue(state.activeMacro,value);
+    const ccLabel=$(`[data-macro-select="${state.activeMacro}"] small`);
+    if(ccLabel) ccLabel.textContent=`CC ${controller}`;
+    announce(`Macro ${state.activeMacro+1} learned MIDI CC ${controller}.`);
+    return;
+  }
+  state.macros.forEach((macro,index)=>{if(macro.midiCc===controller)setMacroValue(index,value);});
+}
+
+async function connectMidiLearn() {
+  if (!navigator.requestMIDIAccess || audio.midiAccess) return;
+  try {
+    audio.midiAccess=await navigator.requestMIDIAccess();
+    const bind=()=>audio.midiAccess.inputs.forEach((input)=>{input.onmidimessage=handleMidiMessage;});
+    bind(); audio.midiAccess.onstatechange=bind;
+  } catch (_) { announce("MIDI permission was not granted. On-screen macro assignment still works."); }
+}
+
+function toggleMidiLearn(force) {
+  state.midiLearnMode=typeof force==="boolean"?force:!state.midiLearnMode;
+  if (!state.midiLearnMode) state.activeMacro=null;
+  else connectMidiLearn();
+  renderMacroPanel(); renderChain(); renderInspector();
+  announce(state.midiLearnMode?"MIDI learn on. Select a macro, then a violet parameter.":"MIDI learn off.");
+}
+
 function renderChain() {
   const chain = $("#signal-chain");
   if (!state.modules.length) {
@@ -666,13 +851,16 @@ function renderChain() {
   }
   chain.innerHTML = state.modules.map((instance, index) => {
     const definition = MODULES[instance.type];
+    const primaryKey = PRIMARY_PARAMETERS[instance.type] || definition.params.find((param)=>param.type!=="select")?.key;
+    const primary = definition.params.find((param)=>param.key===primaryKey);
     const knobs = definition.params.filter((param) => param.type !== "select").slice(0, 3).map((param) => {
       const turn = ((Number(instance.params[param.key]) - param.min) / (param.max - param.min)) * 75 + 5;
       return `<span class="mini-knob" style="--turn:${turn}%" title="${param.label}: ${formatValue(param, instance.params[param.key])}"></span>`;
     }).join("");
     return `<article class="effect-module${state.selectedId === instance.id ? " is-selected" : ""}${instance.bypassed ? " is-bypassed" : ""}" draggable="true" tabindex="0" data-select="${instance.id}" style="--module-color:${definition.color}" aria-label="Select ${definition.name}, position ${index + 1}${instance.bypassed ? ", bypassed" : ""}">
-      <span class="effect-title"><strong>${definition.name}</strong><span>#${String(instance.id).padStart(2, "0")}</span></span>
+      <span class="effect-title"><strong>${definition.name}</strong><span>#${String(instance.id).padStart(2, "0")}</span><button type="button" class="module-delete" data-remove="${instance.id}" aria-label="Delete ${definition.name}" title="Delete module">×</button></span>
       <span class="mini-knobs" aria-hidden="true">${knobs}</span>
+      <button type="button" class="macro-assign-target" data-assign-module="${instance.id}" data-assign-param="${primaryKey}">Assign ${primary?.label || "main control"}</button>
       <span class="effect-footer"><span>${instance.bypassed ? "MUTED" : "ACTIVE"}</span><span class="effect-led"></span></span>
       <span class="module-nudges" aria-label="Move or alter module"><button type="button" data-module-nudge="left" data-module-id="${instance.id}" title="Move left">←</button><button type="button" data-module-nudge="up" data-module-id="${instance.id}" title="Increase main amount">↑</button><button type="button" data-module-nudge="down" data-module-id="${instance.id}" title="Decrease main amount">↓</button><button type="button" data-module-nudge="right" data-module-id="${instance.id}" title="Move right">→</button></span>
     </article>`;
@@ -696,7 +884,7 @@ function renderInspector() {
         <select id="param-${instance.id}-${param.key}" data-param="${param.key}">${param.options.map((option) => `<option value="${option.value}"${instance.params[param.key] === option.value ? " selected" : ""}>${option.label}</option>`).join("")}</select>
         <small>${param.role}</small></div>`;
     }
-    return `<div class="component-control"><div class="component-label"><label for="param-${instance.id}-${param.key}">${param.label}</label><output id="value-${param.key}">${formatValue(param, instance.params[param.key])}</output></div>
+    return `<div class="component-control"><div class="component-label"><label for="param-${instance.id}-${param.key}">${param.label}</label><output id="value-${param.key}">${formatValue(param, instance.params[param.key])}</output><button type="button" class="parameter-map-target" data-assign-module="${instance.id}" data-assign-param="${param.key}">Map</button></div>
       <input id="param-${instance.id}-${param.key}" type="range" min="${param.min}" max="${param.max}" step="${param.step}" value="${instance.params[param.key]}" data-param="${param.key}">
       <small>${param.role}</small></div>`;
   }).join("");
@@ -719,6 +907,7 @@ function refreshCalculation(instance) {
 }
 
 function renderStudio() {
+  renderMacroPanel();
   renderChain();
   renderInspector();
   renderLessons();
@@ -823,6 +1012,7 @@ function createSynthVoice() {
   if (audio.sequencerVoice) return audio.sequencerVoice;
   const ctx = audio.context;
   const profile = SYNTH_PROFILES[state.synthProfile];
+  const voiceParams = state.voiceParams;
   const carrier = ctx.createOscillator();
   const envelope = ctx.createGain();
   const filter = ctx.createBiquadFilter();
@@ -830,16 +1020,17 @@ function createSynthVoice() {
   carrier.frequency.value = 130.81;
   envelope.gain.value = 0.0001;
   filter.type = "lowpass";
-  filter.frequency.value = profile.cutoff;
-  filter.Q.value = profile.resonance;
+  filter.frequency.value = voiceParams.cutoff;
+  filter.Q.value = voiceParams.resonance;
   carrier.connect(envelope);
   let sub = null;
+  let subGain = null;
   if (profile.sub) {
     sub = ctx.createOscillator();
-    const subGain = ctx.createGain();
+    subGain = ctx.createGain();
     sub.type = "square";
     sub.frequency.value = 65.41;
-    subGain.gain.value = .28;
+    subGain.gain.value = voiceParams.subMix / 100;
     sub.connect(subGain); subGain.connect(envelope); sub.start();
     audio.sourceNodes.push(sub, subGain);
   }
@@ -849,8 +1040,8 @@ function createSynthVoice() {
     modulator = ctx.createOscillator();
     modGain = ctx.createGain();
     modulator.type = "sine";
-    modulator.frequency.value = 261.63;
-    modGain.gain.value = 90;
+    modulator.frequency.value = 130.81 * (profile.fmRatio || 2);
+    modGain.gain.value = 130.81 * voiceParams.fmAmount / 100;
     modulator.connect(modGain); modGain.connect(carrier.frequency); modulator.start();
     audio.sourceNodes.push(modulator, modGain);
   }
@@ -864,18 +1055,22 @@ function createSynthVoice() {
   }
   envelope.connect(filter); filter.connect(audio.sourceBus); carrier.start();
   audio.sourceNodes.push(carrier, envelope, filter);
-  audio.sequencerVoice = { carrier, envelope, filter, sub, modulator, modGain };
+  audio.sequencerVoice = { carrier, envelope, filter, sub, subGain, modulator, modGain };
   return audio.sequencerVoice;
 }
 
 function gateSynthNote(note, gateSeconds = null, origin = "keyboard") {
   if (!audio.sequencerVoice || !audio.context) return;
   const { carrier, modulator, modGain, sub, envelope } = audio.sequencerVoice;
+  const profile=SYNTH_PROFILES[state.synthProfile];
+  const attack=Math.max(.001,state.voiceParams.attack/1000);
+  const release=Math.max(.005,state.voiceParams.release/1000);
+  const effectiveAttack=gateSeconds==null?attack:Math.min(attack,gateSeconds*.24);
   const time = audio.context.currentTime;
   envelope.gain.cancelScheduledValues(time);
   envelope.gain.setValueAtTime(Math.max(0.0001, envelope.gain.value), time);
   if (note == null || state.performance.mute) {
-    envelope.gain.setTargetAtTime(0.0001, time, .008);
+    envelope.gain.setTargetAtTime(0.0001, time, Math.max(.004,release/4));
     state.lastMidiMessage = `MIDI: Note Off · ${origin} · channel 1`;
     return;
   }
@@ -883,15 +1078,16 @@ function gateSynthNote(note, gateSeconds = null, origin = "keyboard") {
   carrier.frequency.setTargetAtTime(frequency, time, .006);
   if (sub) sub.frequency.setTargetAtTime(frequency / 2, time, .006);
   if (modulator) {
-    modulator.frequency.setTargetAtTime(frequency * 2, time, .006);
-    modGain.gain.setTargetAtTime(frequency * 1.4, time, .01);
+    modulator.frequency.setTargetAtTime(frequency * (profile.fmRatio || 2), time, .006);
+    modGain.gain.setTargetAtTime(frequency * state.voiceParams.fmAmount / 100, time, .01);
   }
-  envelope.gain.linearRampToValueAtTime(.18, time + .009);
-  envelope.gain.exponentialRampToValueAtTime(.11, time + .045);
+  envelope.gain.linearRampToValueAtTime(.18, time + effectiveAttack);
+  envelope.gain.exponentialRampToValueAtTime(.11, time + effectiveAttack + .035);
   if (gateSeconds != null) {
-    const releaseStart = time + Math.max(.055, gateSeconds - .025);
+    const releaseDuration=Math.min(release,Math.max(.01,gateSeconds*.55));
+    const releaseStart = time + Math.max(effectiveAttack+.04, gateSeconds-releaseDuration);
     envelope.gain.setValueAtTime(.11, releaseStart);
-    envelope.gain.exponentialRampToValueAtTime(.0001, time + Math.max(.08, gateSeconds));
+    envelope.gain.exponentialRampToValueAtTime(.0001, time + Math.max(effectiveAttack+.055, gateSeconds));
   }
   state.lastMidiMessage = `MIDI: Note On ${midiToName(note)} · note ${note} · velocity 100 · ${origin} · channel 1`;
 }
@@ -1234,6 +1430,17 @@ function drawScopes() {
   if (audio.analyser && state.audioOn) {
     const waveformData = new Uint8Array(audio.analyser.fftSize);
     audio.analyser.getByteTimeDomainData(waveformData);
+    const logoWave = $("#logo-wave");
+    if (logoWave) {
+      const samples=25;
+      const points=Array.from({length:samples},(_,index)=>{
+        const value=waveformData[Math.floor(index*(waveformData.length-1)/(samples-1))];
+        return `${index?"L":"M"}${7+index*(50/(samples-1))} ${39+(value-128)/128*17}`;
+      }).join(" ");
+      logoWave.setAttribute("d",points);
+      const rms=Math.sqrt(waveformData.reduce((sum,value)=>sum+Math.pow((value-128)/128,2),0)/waveformData.length);
+      $(".brand-mark")?.classList.toggle("is-sounding",rms>.015);
+    }
     wave.strokeStyle = "#d7ff3f"; wave.lineWidth = 1.5 * w.ratio; wave.beginPath();
     waveformData.forEach((value, index) => {
       const x = index / (waveformData.length - 1) * w.width;
@@ -1255,6 +1462,8 @@ function drawScopes() {
     }
   } else {
     wave.strokeStyle = "#536047"; wave.beginPath(); wave.moveTo(0, w.height / 2); wave.lineTo(w.width, w.height / 2); wave.stroke();
+    $("#logo-wave")?.setAttribute("d","M7 39H57");
+    $(".brand-mark")?.classList.remove("is-sounding");
   }
   window.requestAnimationFrame(drawScopes);
 }
@@ -1922,9 +2131,42 @@ function synthBoardSvg(item) {
   return `<svg class="technical-svg synth-board-svg" viewBox="0 0 900 370" role="img" aria-label="${item.name} educational functional circuit board"><rect x="8" y="8" width="884" height="354" rx="7" class="synth-board-pcb"/><path d="M30 38H870M30 334H870" class="synth-board-rail"/><text x="34" y="31">+V</text><text x="34" y="352">GND</text>${components}${traces}${blocks}<text x="450" y="345" text-anchor="middle" class="synth-board-caption">EDUCATIONAL FUNCTIONAL MAP · NOT A PCB LAYOUT OR CONSTRUCTION SCHEMATIC</text></svg>`;
 }
 
+function effectComponentKind(parameter) {
+  const text=`${parameter.key} ${parameter.label}`.toLowerCase();
+  if(parameter.type==="select"&&text.includes("diode")) return "diode";
+  if(text.includes("capacitor")||/^c/.test(parameter.key)) return "capacitor";
+  if(text.includes("resistor")||/^r/.test(parameter.key)) return "resistor";
+  return "pot";
+}
+
+function effectCircuitDetail(item) {
+  const definition=MODULES[item.moduleType];
+  const params=state.effectCircuitValues[item.moduleType];
+  const calculation=calculateModule({type:item.moduleType,params});
+  const controls=definition.params.map((parameter,index)=>{
+    const kind=effectComponentKind(parameter);
+    const value=parameter.type==="select"?parameter.options.find((option)=>option.value===params[parameter.key])?.label||params[parameter.key]:formatValue(parameter,params[parameter.key]);
+    const control=parameter.type==="select"
+      ? `<select data-effect-circuit-param="${parameter.key}">${parameter.options.map((option)=>`<option value="${option.value}"${option.value===params[parameter.key]?" selected":""}>${option.label}</option>`).join("")}</select>`
+      : `<input type="range" min="${parameter.min}" max="${parameter.max}" step="${parameter.step}" value="${params[parameter.key]}" data-effect-circuit-param="${parameter.key}"><output>${value}</output>`;
+    return `<label class="effect-component-card"><span>${String(index+1).padStart(2,"0")} · ${parameter.label}</span>${componentIcon({kind,displayValue:value,name:parameter.label})}${control}<small>${parameter.role}</small></label>`;
+  }).join("");
+  return `<article class="synth-circuit-viewer effect-circuit-viewer"><header><div><span>${item.maker}</span><h3>${item.name}</h3></div><b>${item.status}</b></header><div class="synth-board-wrap">${synthBoardSvg(item)}</div><div class="synth-flow">${item.blocks.map((block,index)=>`<span>${block}${index<item.blocks.length-1?`<i>→</i>`:""}</span>`).join("")}</div><div class="effect-circuit-actions"><p>Change a component below to update the calculated relationship and the browser model. These behavioral study folders do not replace an audited physical netlist.</p><button type="button" data-add-effect-circuit="${item.moduleType}">Add this circuit to Studio</button></div><div class="effect-component-grid">${controls}</div><div class="calculation-box"><p class="evidence-label">Calculated relationship</p><h4>${calculation.title}</h4><p class="formula">${calculation.formula}</p><p>${calculation.substitution}</p><p><strong>${calculation.result}</strong></p><p>${calculation.why}</p></div></article>`;
+}
+
+function effectFolderPreview(item) {
+  if(!item.moduleType) return "";
+  const definition=MODULES[item.moduleType];
+  const numeric=definition.params.filter((parameter)=>parameter.type!=="select").slice(0,2);
+  return `<div class="folder-component-preview">${numeric.map((parameter)=>componentIcon({kind:effectComponentKind(parameter),displayValue:formatValue(parameter,state.effectCircuitValues[item.moduleType][parameter.key]),name:parameter.label})).join("")}</div>`;
+}
+
 function synthReferenceView() {
-  const selected = SYNTH_REFERENCES.find((item)=>item.id===state.selectedSynthReference) || SYNTH_REFERENCES[0];
-  return `<section id="construction-synths" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Clickable circuit explorer</p><h2>Synth circuits and signal flow</h2></div><span>Select an instrument to display its circuit map</span></div><p class="synth-reference-boundary">Korg and Moog exact drawings remain at their official sources under manufacturer terms. The large in-app board is a functional educational map, not an invented PCB layout.</p><div class="synth-explorer"><nav class="synth-reference-list" aria-label="Synth circuit choices">${SYNTH_REFERENCES.map((item)=>`<button type="button" class="synth-reference-card${item.id===selected.id?" is-selected":""}" data-synth-reference="${item.id}" aria-pressed="${item.id===selected.id}"><span>${item.maker}</span><strong>${item.name}</strong><small>${item.status}</small></button>`).join("")}</nav><article class="synth-circuit-viewer"><header><div><span>${selected.maker}</span><h3>${selected.name}</h3></div><b>${selected.status}</b></header><div class="synth-board-wrap">${synthBoardSvg(selected)}</div><div class="synth-flow">${selected.blocks.map((block,index)=>`<span>${block}${index<selected.blocks.length-1?`<i>→</i>`:""}</span>`).join("")}</div><p>${selected.note}</p><a href="${selected.source}" target="_blank" rel="noopener noreferrer">View the exact official source ↗</a></article></div></section>`;
+  const choices=[...EFFECT_CIRCUITS,...SYNTH_REFERENCES];
+  const selected = choices.find((item)=>item.id===state.selectedSynthReference) || choices[0];
+  const list=(items,label)=>`<span class="synth-list-heading">${label}</span>${items.map((item)=>`<button type="button" class="synth-reference-card${item.id===selected.id?" is-selected":""}" data-synth-reference="${item.id}" aria-pressed="${item.id===selected.id}">${effectFolderPreview(item)}<span>${item.maker}</span><strong>${item.name}</strong><small>${item.status}</small></button>`).join("")}`;
+  const detail=selected.moduleType?effectCircuitDetail(selected):`<article class="synth-circuit-viewer"><header><div><span>${selected.maker}</span><h3>${selected.name}</h3></div><b>${selected.status}</b></header><div class="synth-board-wrap">${synthBoardSvg(selected)}</div><div class="synth-flow">${selected.blocks.map((block,index)=>`<span>${block}${index<selected.blocks.length-1?`<i>→</i>`:""}</span>`).join("")}</div><p>${selected.note}</p><a href="${selected.source}" target="_blank" rel="noopener noreferrer">View the exact official source ↗</a></article>`;
+  return `<section id="construction-synths" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Clickable circuit explorer</p><h2>Effect and synth circuits</h2></div><span>Select a folder to display its circuit and parts</span></div><p class="synth-reference-boundary">Studio effect folders expose switchable behavioral components and calculations. Manufacturer references show documented signal flow and link the official source; they are not presented as construction-ready PCB layouts.</p><div class="synth-explorer"><nav class="synth-reference-list" aria-label="Effect and synth circuit choices">${list(EFFECT_CIRCUITS,"Studio effect circuits")}${list(SYNTH_REFERENCES,"Manufacturer references")}</nav>${detail}</div></section>`;
 }
 
 function renderConstruction() {
@@ -2151,6 +2393,12 @@ function bindEvents() {
     if (add) return addModule(add.dataset.add);
     const nudge = event.target.closest("[data-module-nudge]");
     if (nudge) return nudgeModule(Number(nudge.dataset.moduleId), nudge.dataset.moduleNudge);
+    const remove = event.target.closest("[data-remove]");
+    if (remove) return removeModule(Number(remove.dataset.remove));
+    const voiceAssign=event.target.closest("[data-assign-voice-param]");
+    if(voiceAssign&&state.midiLearnMode) return assignMacroToVoice(voiceAssign.dataset.assignVoiceParam);
+    const assign = event.target.closest("[data-assign-module]");
+    if (assign && state.midiLearnMode) return assignMacroToParameter(Number(assign.dataset.assignModule),assign.dataset.assignParam);
     const select = event.target.closest("[data-select]");
     if (select) { state.selectedId = Number(select.dataset.select); renderChain(); renderInspector(); return; }
     const bypass = event.target.closest("[data-bypass]");
@@ -2158,12 +2406,26 @@ function bindEvents() {
       const instance = state.modules.find((item) => item.id === Number(bypass.dataset.bypass));
       instance.bypassed = !instance.bypassed; renderStudio(); rebuildAudioGraph(); announce(instance.bypassed ? "Module bypassed." : "Module enabled."); return;
     }
-    const remove = event.target.closest("[data-remove]");
-    if (remove) return removeModule(Number(remove.dataset.remove));
     const move = event.target.closest("[data-move]");
     if (move) return moveModule(state.selectedId, Number(move.dataset.move));
     const tab = event.target.closest(".tab");
     if (tab) return showView(tab.dataset.view);
+  });
+
+  $("#midi-learn-toggle").addEventListener("click",()=>toggleMidiLearn());
+  $("#macro-knobs").addEventListener("click",(event)=>{
+    const select=event.target.closest("[data-macro-select]");
+    if(!select) return;
+    state.activeMacro=Number(select.dataset.macroSelect);
+    if(!state.midiLearnMode) state.midiLearnMode=true;
+    connectMidiLearn(); renderMacroPanel(); renderChain(); renderInspector();
+  });
+  $("#macro-knobs").addEventListener("input",(event)=>{
+    const control=event.target.closest("[data-macro-value]");
+    if(control) setMacroValue(Number(control.dataset.macroValue),control.value);
+  });
+  document.addEventListener("keydown",(event)=>{
+    if(event.metaKey && event.key.toLowerCase()==="m") { event.preventDefault(); toggleMidiLearn(); }
   });
 
   $("#inspector-content").addEventListener("input", (event) => {
@@ -2193,12 +2455,11 @@ function bindEvents() {
   $("#sequencer-start").addEventListener("click", startSequencerTransport);
   $("#sequencer-stop").addEventListener("click", stopSequencerTransport);
   $("#synth-profile").addEventListener("change", async (event) => {
-    state.synthProfile = event.target.value;
-    state.synthWaveform = SYNTH_PROFILES[state.synthProfile].wave;
-    $("#synth-waveform").value = state.synthWaveform;
+    applySynthProfile(event.target.value);
     if (state.sequencerRunning) await startSource();
   });
   $("#synth-waveform").addEventListener("change", async (event) => { state.synthWaveform = event.target.value; if (state.sequencerRunning) await startSource(); });
+  $("#voice-parameter-knobs").addEventListener("input",(event)=>{const control=event.target.closest("[data-voice-param]");if(control)updateVoiceParameter(control.dataset.voiceParam,control.value);});
   $("#arp-mode").addEventListener("change", (event) => { state.arpMode = event.target.value; });
   $("#midi-bpm").addEventListener("change", async (event) => { state.midiBpm = clamp(Number(event.target.value)||120,30,300); event.target.value=state.midiBpm; if(state.sequencerRunning) await startSource(); });
   $("#step-division").addEventListener("change", async (event) => { state.stepDivision=Number(event.target.value); if(state.sequencerRunning) await startSource(); });
@@ -2424,11 +2685,21 @@ function bindEvents() {
     applyHardwareChoice(control.key, snappedControlValue(control, next));
   }, { passive: false });
   $("#construction-panel").addEventListener("click", (event) => {
+    const addEffect=event.target.closest("[data-add-effect-circuit]");
+    if(addEffect){
+      const type=addEffect.dataset.addEffectCircuit;
+      const instance=addModule(type);
+      instance.params={...state.effectCircuitValues[type]};
+      renderStudio(); rebuildAudioGraph();
+      announce(`${MODULES[type].name} circuit added to the Studio chain.`);
+      return;
+    }
     const synthReference = event.target.closest("[data-synth-reference]");
     if (synthReference) {
       state.selectedSynthReference = synthReference.dataset.synthReference;
       renderConstruction();
-      announce(`${SYNTH_REFERENCES.find((item)=>item.id===state.selectedSynthReference)?.name || "Synth"} circuit map selected.`);
+      const choice=[...EFFECT_CIRCUITS,...SYNTH_REFERENCES].find((item)=>item.id===state.selectedSynthReference);
+      announce(`${choice?.name || "Circuit"} selected.`);
       return;
     }
     const step = event.target.closest("[data-assembly-step]");
@@ -2442,6 +2713,16 @@ function bindEvents() {
       state.assemblyCompleted[id] = [...completed];
       renderConstruction();
     }
+  });
+  $("#construction-panel").addEventListener("change",(event)=>{
+    const control=event.target.closest("[data-effect-circuit-param]");
+    if(!control) return;
+    const item=EFFECT_CIRCUITS.find((entry)=>entry.id===state.selectedSynthReference);
+    if(!item) return;
+    const parameter=MODULES[item.moduleType].params.find((entry)=>entry.key===control.dataset.effectCircuitParam);
+    state.effectCircuitValues[item.moduleType][parameter.key]=parameter.type==="select"?control.value:Number(control.value);
+    renderConstruction();
+    announce(`${parameter.label} changed in the ${item.name} study circuit.`);
   });
   const revealContextHelp = (event) => {
     const target = event.target.closest("[data-help-key]");
@@ -2598,6 +2879,8 @@ function bindEvents() {
 
 renderLibrary();
 renderSynthKeyboard();
+renderMacroPanel();
+renderVoiceControls();
 bindEvents();
 renderSequencer();
 renderHardware();
