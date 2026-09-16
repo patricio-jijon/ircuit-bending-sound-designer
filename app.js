@@ -7,7 +7,10 @@ const COLORS = {
   distortion: "#f8bd4b",
   octave: "#bb91ff",
   delay: "#55d7a1",
-  glitch: "#f3f4e9"
+  glitch: "#f3f4e9",
+  ladder: "#73d0b4",
+  korgfilter: "#f2d15f",
+  brute: "#ef856f"
 };
 
 const MODULES = {
@@ -154,6 +157,45 @@ const MODULES = {
       ["100 nF film capacitor", 1, 0.22, "100nF film capacitor"],
       ["500 kΩ potentiometer", 1, 1.45, "500k potentiometer electronics"]
     ]
+  },
+  ladder: {
+    name: "Moog-style Ladder",
+    shortName: "LADR",
+    description: "A behavioral four-pole low-pass response inspired by classic ladder-filter signal flow; not a transistor-level Moog circuit simulation.",
+    color: COLORS.ladder,
+    params: [
+      { key: "cutoff", label: "Cutoff frequency", unit: "Hz", min: 40, max: 12000, step: 10, value: 1200, role: "Lowers or raises the frequency above which harmonics are attenuated." },
+      { key: "resonance", label: "Resonance", unit: "%", min: 0, max: 95, step: 1, value: 38, role: "Emphasizes frequencies near cutoff; high settings can ring." },
+      { key: "drive", label: "Input drive", unit: "%", min: 0, max: 100, step: 1, value: 30, role: "Adds a soft nonlinear stage before the filter." },
+      { key: "mix", label: "Wet mix", unit: "%", min: 0, max: 100, step: 1, value: 100, role: "Blends filtered and direct signal." }
+    ],
+    bom: [["Educational four-pole filter model",1,0,"official Werkstatt schematic reference; not a construction BOM"]]
+  },
+  korgfilter: {
+    name: "Korg monotron-style VCF",
+    shortName: "K-VCF",
+    description: "A resonant behavioral VCF informed by Korg's public monotron signal path; it does not reproduce the copyrighted schematic.",
+    color: COLORS.korgfilter,
+    params: [
+      { key: "cutoff", label: "Cutoff frequency", unit: "Hz", min: 40, max: 12000, step: 10, value: 1800, role: "Sets the main spectral boundary." },
+      { key: "resonance", label: "Peak / resonance", unit: "%", min: 0, max: 96, step: 1, value: 55, role: "Raises the level around cutoff." },
+      { key: "mode", label: "Filter mode", type: "select", value: "lowpass", options: [{value:"lowpass",label:"Low-pass"},{value:"highpass",label:"High-pass"}], role: "Selects which side of the cutoff is retained." },
+      { key: "mix", label: "Wet mix", unit: "%", min: 0, max: 100, step: 1, value: 100, role: "Blends filtered and direct signal." }
+    ],
+    bom: [["Educational resonant VCF model",1,0,"Korg public schematic reference; not a construction BOM"]]
+  },
+  brute: {
+    name: "Arturia-style Steiner Filter",
+    shortName: "BRUTE",
+    description: "A behavioral multimode filter and feedback-drive stage based on the documented MicroBrute architecture, not an Arturia schematic.",
+    color: COLORS.brute,
+    params: [
+      { key: "cutoff", label: "Cutoff frequency", unit: "Hz", min: 40, max: 12000, step: 10, value: 2100, role: "Sets the multimode filter corner." },
+      { key: "resonance", label: "Resonance", unit: "%", min: 0, max: 95, step: 1, value: 42, role: "Emphasizes the cutoff region." },
+      { key: "mode", label: "Filter mode", type: "select", value: "lowpass", options: [{value:"lowpass",label:"Low-pass"},{value:"bandpass",label:"Band-pass"},{value:"highpass",label:"High-pass"}], role: "Matches the documented low-, band-, and high-pass architecture." },
+      { key: "brute", label: "Feedback drive", unit: "%", min: 0, max: 100, step: 1, value: 35, role: "Models the increasing saturation of a feedback-drive control." }
+    ],
+    bom: [["Educational multimode filter model",1,0,"Arturia manual architecture reference; no construction schematic"]]
   }
 };
 
@@ -166,6 +208,14 @@ const BASE_BOM = [
   ["10 µF electrolytic capacitor, 25 V", 2, 0.18, "10uF 25V electrolytic capacitor"]
 ];
 
+const SYNTH_REFERENCES = [
+  { id:"moog-werkstatt", maker:"Moog", name:"Werkstatt-01", status:"Manufacturer-published schematic", source:"https://api.moogmusic.com/sites/default/files/2020-11/Werkstatt_01_Manual_2020.pdf", blocks:["Keyboard CV / Gate","VCO","4-pole ladder VCF","VCA","LFO / EG","Audio out"], note:"Moog's official manual includes a schematic under its download agreement. This app shows an educational signal-flow summary and links to the original; it does not reproduce the schematic." },
+  { id:"korg-monotron", maker:"Korg", name:"monotron", status:"Manufacturer-published schematic", source:"https://www.korg.com/us/support/download/others/0/311/1893/", blocks:["Ribbon CV / Gate","VCO","Resonant VCF","VCA","Headphone amp"], note:"Korg officially publishes the monotron schematic with license and warranty conditions. Open the source to view the authentic drawing." },
+  { id:"arturia-microbrute", maker:"Arturia", name:"MicroBrute", status:"Official architecture manual · no public construction schematic used", source:"https://downloads.arturia.com/products/microbrute/manual/MicroBrute_Manual_EN.pdf", blocks:["VCO + wave shapers","Oscillator mixer","Steiner-Parker VCF","Brute feedback","VCA","ADSR / LFO / sequencer"], note:"The official manual documents a 100% analog voice path, multimode filter, modulation matrix, MIDI and 64-step sequencing. The app models those blocks behaviorally." },
+  { id:"yamaha-modx", maker:"Yamaha", name:"MODX / MODX M", status:"Official MIDI and signal-flow manuals · digital architecture", source:"https://usa.yamaha.com/products/music_production/synthesizers/modx/downloads.html", blocks:["Keyboard / MIDI in","Arpeggiator","AWM2 / FM-X / AN-X engines","Motion sequencer","Effects","Audio / MIDI out"], note:"Yamaha documents MIDI clock, arpeggiator, tone-generator and sequencer routing. This is an architecture reference, not a service schematic." },
+  { id:"casio-mzx", maker:"Casio", name:"MZ-X series", status:"Official user/MIDI documentation · digital architecture", source:"https://support.casio.com/en/support/download.php?cid=008&pid=1209", blocks:["Keys / pads / MIDI","Pattern recorder","Tone generator","Mixer","DSP effects","Audio / MIDI out"], note:"Casio publishes operating, pattern-recorder and MIDI documentation. No manufacturer construction schematic is represented here." }
+];
+
 let nextId = 1;
 const state = {
   modules: [],
@@ -173,6 +223,19 @@ const state = {
   audioOn: false,
   audioStarting: false,
   source: "demo",
+  synthProfile: "werkstatt",
+  synthWaveform: "sawtooth",
+  arpMode: "pattern",
+  midiBpm: 120,
+  stepDivision: 4,
+  patternDuration: 0,
+  startDelay: "0",
+  sequencerBar: 0,
+  sequencerStep: 0,
+  sequencerRunning: false,
+  sequencePattern: [48,null,52,null,55,null,59,null,60,null,55,null,52,null,48,50,52,55,57,55,52,50,null,null,null,null,null,null,null,null,null,null],
+  lastMidiMessage: "MIDI: waiting · channel 1",
+  performance: { repeat:false, freeze:false, mute:false },
   prices: {},
   hardwarePreset: "dual555",
   hardwareLoadedId: null,
@@ -216,7 +279,11 @@ let audio = {
   stream: null,
   fileBuffer: null,
   riffTimer: null,
-  limiter: null
+  limiter: null,
+  sequenceStartTimer: null,
+  sequenceTimer: null,
+  sequenceStopTimer: null,
+  sequencerVoice: null
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -293,6 +360,132 @@ function showHelp(topic = "mixing", reset = true) {
   renderEngineeringHelp();
 }
 
+const SEQUENCER_ROWS = [72, 69, 67, 64, 60, 57, 55, 52];
+const SYNTH_PROFILES = {
+  werkstatt: { wave:"sawtooth", cutoff:1300, resonance:7, sub:true, label:"Moog Werkstatt-style behavioral voice" },
+  monotron: { wave:"sawtooth", cutoff:1900, resonance:10, sub:false, label:"Korg monotron-style behavioral voice" },
+  microbrute: { wave:"sawtooth", cutoff:2400, resonance:6, sub:true, label:"Arturia MicroBrute-style behavioral voice" },
+  "yamaha-fm": { wave:"sine", cutoff:6200, resonance:1, fm:true, label:"Yamaha FM-style behavioral voice" },
+  "casio-pcm": { wave:"triangle", cutoff:4800, resonance:2, chorus:true, label:"Casio PCM-style behavioral voice" }
+};
+
+function midiToName(note) {
+  const names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  return `${names[note % 12]}${Math.floor(note / 12) - 1}`;
+}
+
+function noteNameToMidi(token) {
+  const match = String(token).trim().match(/^([A-Ga-g])([#b]?)(-?\d)$/);
+  if (!match) return null;
+  const base = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[match[1].toUpperCase()];
+  const accidental = match[2] === "#" ? 1 : match[2] === "b" ? -1 : 0;
+  return clamp((Number(match[3]) + 1) * 12 + base + accidental, 0, 127);
+}
+
+function midiFrequency(note) {
+  return 440 * Math.pow(2, (note - 69) / 12);
+}
+
+function patternText() {
+  return state.sequencePattern.map((note,index) => `${index === 16 ? "| " : ""}${note == null ? "-" : midiToName(note)}`).join(" ");
+}
+
+function renderSequencer() {
+  const start = state.sequencerBar * 16;
+  $("#arp-grid").innerHTML = `<div class="arp-step-numbers"><span></span>${Array.from({length:16},(_,index)=>`<b>${index + 1}</b>`).join("")}</div>${SEQUENCER_ROWS.map((note) => `<div class="arp-note-row" role="row"><span>${midiToName(note)}</span>${Array.from({length:16},(_,index)=>{const patternIndex=start+index;const active=state.sequencePattern[patternIndex]===note;return `<button type="button" role="gridcell" data-pattern-step="${patternIndex}" data-pattern-note="${note}" aria-pressed="${active}" aria-label="${midiToName(note)}, bar ${state.sequencerBar+1}, step ${index+1}"><i></i></button>`;}).join("")}</div>`).join("")}`;
+  $$('[data-pattern-bar]').forEach((button)=>button.setAttribute("aria-selected",String(Number(button.dataset.patternBar)===state.sequencerBar)));
+  $("#midi-pattern").value = patternText();
+  updateSequencerPlayhead();
+}
+
+function updateSequencerPlayhead() {
+  const localStep = state.sequencerStep % 16;
+  const bar = Math.floor(state.sequencerStep / 16);
+  $("#sequencer-status").textContent = `${state.sequencerRunning ? "Running" : "Stopped"} · bar ${bar + 1} · step ${localStep + 1}`;
+  $("#midi-message").textContent = state.lastMidiMessage;
+  $$("#arp-grid [data-pattern-step]").forEach((button) => button.classList.toggle("is-playing", Number(button.dataset.patternStep) === state.sequencerStep));
+}
+
+function applyMidiText() {
+  const tokens = $("#midi-pattern").value.replaceAll("|", " ").split(/[\s,]+/).filter(Boolean);
+  const pattern = tokens.slice(0,32).map((token) => token === "-" || /^rest$/i.test(token) ? null : noteNameToMidi(token));
+  while (pattern.length < 32) pattern.push(null);
+  state.sequencePattern = pattern;
+  renderSequencer();
+  announce("Two-bar MIDI note pattern applied.");
+}
+
+function sequenceNoteForStep(step) {
+  const active = state.sequencePattern.filter((note) => note != null);
+  if (!active.length) return null;
+  if (state.arpMode === "up") return [...new Set(active)].sort((a,b)=>a-b)[step % new Set(active).size];
+  if (state.arpMode === "down") return [...new Set(active)].sort((a,b)=>b-a)[step % new Set(active).size];
+  if (state.arpMode === "random") return active[Math.floor(Math.random() * active.length)];
+  const note = state.sequencePattern[step];
+  if (state.arpMode === "glitch" && note != null && Math.random() > .62) return clamp(note + (Math.random() > .5 ? 12 : -12), 0, 127);
+  return note;
+}
+
+function triggerSequenceStep() {
+  if (!state.sequencerRunning || !audio.sequencerVoice) return;
+  if (state.performance.freeze) return;
+  const note = sequenceNoteForStep(state.sequencerStep);
+  const { carrier, modulator, modGain, sub, envelope } = audio.sequencerVoice;
+  const time = audio.context.currentTime;
+  const frequency = note == null ? 0 : midiFrequency(note);
+  envelope.gain.cancelScheduledValues(time);
+  if (note == null || state.performance.mute) {
+    state.lastMidiMessage = "MIDI: Note Off · channel 1";
+    envelope.gain.setTargetAtTime(0, time, .006);
+  } else {
+    state.lastMidiMessage = `MIDI: Note On ${midiToName(note)} · note ${note} · velocity 100 · channel 1`;
+    carrier.frequency.setTargetAtTime(frequency, time, .008);
+    if (sub) sub.frequency.setTargetAtTime(frequency / 2, time, .008);
+    if (modulator) {
+      modulator.frequency.setTargetAtTime(frequency * 2, time, .008);
+      modGain.gain.setTargetAtTime(frequency * 1.4, time, .012);
+    }
+    envelope.gain.setValueAtTime(0.001, time);
+    envelope.gain.linearRampToValueAtTime(.18, time + .012);
+    envelope.gain.exponentialRampToValueAtTime(.035, time + Math.max(.06, sequenceIntervalMs() / 1000 * .82));
+  }
+  updateSequencerPlayhead();
+  if (!state.performance.repeat) state.sequencerStep = (state.sequencerStep + 1) % 32;
+}
+
+function sequenceIntervalMs() {
+  return (60000 / state.midiBpm) / state.stepDivision;
+}
+
+function randomizePattern(glitch = false) {
+  const density = glitch ? .72 : .48;
+  state.sequencePattern = Array.from({length:32},(_,index) => Math.random() < density ? SEQUENCER_ROWS[(index + Math.floor(Math.random() * SEQUENCER_ROWS.length)) % SEQUENCER_ROWS.length] + (glitch && Math.random() > .76 ? 12 : 0) : null);
+  renderSequencer();
+  announce(glitch ? "Glitch fill generated across two bars." : "Two-bar pattern randomized.");
+}
+
+async function startSequencerTransport() {
+  state.source = "sequencer";
+  $("#source-select").value = "sequencer";
+  await ensureAudio();
+  stopSource();
+  state.audioOn = true;
+  rebuildAudioGraph();
+  const delay = state.startDelay === "bars" ? (8 * 60000 / state.midiBpm) : Number(state.startDelay) * 1000;
+  $("#sequencer-status").textContent = delay ? `Count-in · ${(delay/1000).toFixed(1)} s` : "Starting";
+  window.clearTimeout(audio.sequenceStartTimer);
+  audio.sequenceStartTimer = window.setTimeout(startSource, delay);
+  syncAudioButtons();
+}
+
+async function stopSequencerTransport() {
+  stopSource();
+  state.audioOn = false;
+  if (audio.context) await audio.context.suspend();
+  syncAudioButtons();
+  updateSequencerPlayhead();
+}
+
 function announce(message) {
   const toast = $("#toast");
   toast.textContent = message;
@@ -332,6 +525,24 @@ function moveModule(id, direction) {
   renderStudio();
   rebuildAudioGraph();
   announce("Signal order changed. Listen for how each stage processes the previous one.");
+}
+
+function nudgeModule(id, direction) {
+  if (direction === "left" || direction === "right") return moveModule(id, direction === "left" ? -1 : 1);
+  const instance = state.modules.find((item) => item.id === id);
+  if (!instance) return;
+  const definition = MODULES[instance.type];
+  const preferred = ["mix","level","depth","drive","feedback","resonance","brute","blend"];
+  const parameter = preferred.map((key) => definition.params.find((item) => item.key === key && item.type !== "select")).find(Boolean)
+    || definition.params.find((item) => item.type !== "select");
+  if (!parameter) return;
+  const span = Number(parameter.max) - Number(parameter.min);
+  const change = Math.max(Number(parameter.step) || 1, span / 10) * (direction === "up" ? 1 : -1);
+  instance.params[parameter.key] = clamp(Number(instance.params[parameter.key]) + change, Number(parameter.min), Number(parameter.max));
+  state.selectedId = id;
+  renderStudio();
+  rebuildAudioGraph();
+  announce(`${definition.name} ${parameter.label.toLowerCase()} ${direction === "up" ? "increased" : "decreased"}.`);
 }
 
 function formatValue(param, value) {
@@ -396,6 +607,17 @@ function calculateModule(instance) {
       why: "Full-wave rectification repeats the waveform shape twice per cycle, emphasizing an octave-up component. Clean single notes make the effect easiest to hear."
     };
   }
+  if (["ladder","korgfilter","brute"].includes(instance.type)) {
+    const mode = p.mode || "lowpass";
+    const poles = instance.type === "ladder" ? 4 : 2;
+    return {
+      title: `${poles}-pole behavioral filter response`,
+      formula: `fc = ${Number(p.cutoff).toFixed(0)} Hz; slope ≈ ${poles * 6} dB/octave`,
+      substitution: `resonance = ${Number(p.resonance).toFixed(0)}% · mode = ${mode}`,
+      result: `${Number(p.cutoff).toFixed(0)} Hz ${mode} · ${poles}-pole educational model`,
+      why: `${MODULES[instance.type].name} follows the manufacturer-documented signal-flow idea, but Web Audio biquads and waveshaping do not reproduce the original transistor, OTA, or feedback circuit.`
+    };
+  }
   if (instance.type === "glitch") {
     const chopRate = 1 / (2.2 * p.clockR * 1000 * p.clockC * 1e-6);
     return {
@@ -441,11 +663,12 @@ function renderChain() {
       const turn = ((Number(instance.params[param.key]) - param.min) / (param.max - param.min)) * 75 + 5;
       return `<span class="mini-knob" style="--turn:${turn}%" title="${param.label}: ${formatValue(param, instance.params[param.key])}"></span>`;
     }).join("");
-    return `<button class="effect-module${state.selectedId === instance.id ? " is-selected" : ""}${instance.bypassed ? " is-bypassed" : ""}" type="button" data-select="${instance.id}" style="--module-color:${definition.color}" aria-label="Select ${definition.name}, position ${index + 1}${instance.bypassed ? ", bypassed" : ""}">
+    return `<article class="effect-module${state.selectedId === instance.id ? " is-selected" : ""}${instance.bypassed ? " is-bypassed" : ""}" draggable="true" tabindex="0" data-select="${instance.id}" style="--module-color:${definition.color}" aria-label="Select ${definition.name}, position ${index + 1}${instance.bypassed ? ", bypassed" : ""}">
       <span class="effect-title"><strong>${definition.name}</strong><span>#${String(instance.id).padStart(2, "0")}</span></span>
       <span class="mini-knobs" aria-hidden="true">${knobs}</span>
-      <span class="effect-footer"><span>${instance.bypassed ? "BYPASSED" : "ACTIVE"}</span><span class="effect-led"></span></span>
-    </button>`;
+      <span class="effect-footer"><span>${instance.bypassed ? "MUTED" : "ACTIVE"}</span><span class="effect-led"></span></span>
+      <span class="module-nudges" aria-label="Move or alter module"><button type="button" data-module-nudge="left" data-module-id="${instance.id}" title="Move left">←</button><button type="button" data-module-nudge="up" data-module-id="${instance.id}" title="Increase main amount">↑</button><button type="button" data-module-nudge="down" data-module-id="${instance.id}" title="Decrease main amount">↓</button><button type="button" data-module-nudge="right" data-module-id="${instance.id}" title="Move right">→</button></span>
+    </article>`;
   }).join("");
 }
 
@@ -566,7 +789,15 @@ async function ensureAudio() {
 
 function stopSource() {
   window.clearInterval(audio.riffTimer);
+  window.clearInterval(audio.sequenceTimer);
+  window.clearTimeout(audio.sequenceStopTimer);
+  window.clearTimeout(audio.sequenceStartTimer);
   audio.riffTimer = null;
+  audio.sequenceTimer = null;
+  audio.sequenceStopTimer = null;
+  audio.sequenceStartTimer = null;
+  audio.sequencerVoice = null;
+  state.sequencerRunning = false;
   audio.sourceNodes.forEach((node) => {
     try { if (typeof node.stop === "function") node.stop(); } catch (_) { /* already stopped */ }
     try { node.disconnect(); } catch (_) { /* already disconnected */ }
@@ -576,6 +807,7 @@ function stopSource() {
     audio.stream.getTracks().forEach((track) => track.stop());
     audio.stream = null;
   }
+  if ($("#sequencer-status")) updateSequencerPlayhead();
 }
 
 async function startSource() {
@@ -608,6 +840,53 @@ async function startSource() {
     source.connect(audio.sourceBus);
     source.start();
     audio.sourceNodes.push(source);
+    return;
+  }
+  if (state.source === "sequencer") {
+    const profile = SYNTH_PROFILES[state.synthProfile];
+    const carrier = ctx.createOscillator();
+    const envelope = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    carrier.type = state.synthWaveform || profile.wave;
+    envelope.gain.value = .001;
+    filter.type = "lowpass";
+    filter.frequency.value = profile.cutoff;
+    filter.Q.value = profile.resonance;
+    carrier.connect(envelope);
+    let sub = null;
+    if (profile.sub) {
+      sub = ctx.createOscillator();
+      const subGain = ctx.createGain();
+      sub.type = "square";
+      subGain.gain.value = .28;
+      sub.connect(subGain); subGain.connect(envelope); sub.start();
+      audio.sourceNodes.push(sub, subGain);
+    }
+    let modulator = null;
+    let modGain = null;
+    if (profile.fm) {
+      modulator = ctx.createOscillator();
+      modGain = ctx.createGain();
+      modulator.type = "sine";
+      modulator.connect(modGain); modGain.connect(carrier.frequency); modulator.start();
+      audio.sourceNodes.push(modulator, modGain);
+    }
+    if (profile.chorus) {
+      const chorus = ctx.createDelay(.03);
+      const chorusGain = ctx.createGain();
+      chorus.delayTime.value = .012;
+      chorusGain.gain.value = .35;
+      envelope.connect(chorus); chorus.connect(chorusGain); chorusGain.connect(filter);
+      audio.sourceNodes.push(chorus, chorusGain);
+    }
+    envelope.connect(filter); filter.connect(audio.sourceBus); carrier.start();
+    audio.sourceNodes.push(carrier, envelope, filter);
+    audio.sequencerVoice = { carrier, envelope, filter, sub, modulator, modGain };
+    state.sequencerRunning = true;
+    triggerSequenceStep();
+    audio.sequenceTimer = window.setInterval(triggerSequenceStep, sequenceIntervalMs());
+    if (state.patternDuration > 0) audio.sequenceStopTimer = window.setTimeout(stopSequencerTransport, state.patternDuration * 60000);
+    announce(`${profile.label} running at ${state.midiBpm} BPM.`);
     return;
   }
   const output = ctx.createGain();
@@ -733,6 +1012,32 @@ function createModuleProcessor(instance) {
     input.connect(dry); dry.connect(output);
     input.connect(highpass); highpass.connect(shaper); shaper.connect(dcBlock); dcBlock.connect(wet); wet.connect(output);
     nodes.push(dry, wet, shaper, highpass, dcBlock);
+  } else if (["ladder","korgfilter","brute"].includes(instance.type)) {
+    const dry = ctx.createGain();
+    const wet = ctx.createGain();
+    const drive = ctx.createWaveShaper();
+    const filters = [];
+    const mix = (p.mix ?? 100) / 100;
+    const driveAmount = Number(p.drive ?? p.brute ?? 15);
+    drive.curve = makeCurve(clamp(1 + driveAmount * .65, 1, 72), .92);
+    drive.oversample = "4x";
+    dry.gain.value = 1 - mix;
+    wet.gain.value = mix;
+    input.connect(dry); dry.connect(output);
+    input.connect(drive);
+    const filterCount = instance.type === "ladder" ? 4 : 1;
+    let previous = drive;
+    for (let index = 0; index < filterCount; index++) {
+      const filter = ctx.createBiquadFilter();
+      filter.type = instance.type === "ladder" ? "lowpass" : (p.mode || "lowpass");
+      filter.frequency.value = clamp(Number(p.cutoff), 30, 18000);
+      filter.Q.value = index === filterCount - 1 ? clamp(Number(p.resonance) / 8, .1, 14) : .707;
+      previous.connect(filter);
+      previous = filter;
+      filters.push(filter);
+    }
+    previous.connect(wet); wet.connect(output);
+    nodes.push(dry, wet, drive, ...filters);
   } else if (instance.type === "delay") {
     const dry = ctx.createGain();
     const wet = ctx.createGain();
@@ -1527,6 +1832,10 @@ function assemblyTutorial(preset) {
   </div>`;
 }
 
+function synthReferenceView() {
+  return `<section id="construction-synths" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Manufacturer references</p><h2>Synth circuits and signal flow</h2></div><span>Official source status shown for every instrument</span></div><p class="synth-reference-boundary">Moog and Korg publish official schematic material under their download terms. Arturia, Yamaha, and Casio entries below are architecture references from official manuals; they are not presented as construction schematics.</p><div class="synth-reference-list">${SYNTH_REFERENCES.map((item)=>`<article class="synth-reference-card"><header><span>${item.maker}</span><h3>${item.name}</h3><b>${item.status}</b></header><div class="synth-flow">${item.blocks.map((block,index)=>`<span>${block}${index<item.blocks.length-1?`<i>→</i>`:""}</span>`).join("")}</div><p>${item.note}</p><a href="${item.source}" target="_blank" rel="noopener noreferrer">Open official manufacturer source ↗</a></article>`).join("")}</div></section>`;
+}
+
 function renderConstruction() {
   const preset = hardwarePreset();
   const panel = $("#construction-panel");
@@ -1539,7 +1848,8 @@ function renderConstruction() {
     schematic: `<section id="construction-schematic" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Electrical view</p><h2>${preset.name} schematic</h2></div><span>Highlighted targets share the component inspector</span></div><div class="canvas-zoom-surface">${schematicSvg(preset)}</div><p class="graphic-caption"><strong>Calculated and browser-simulated:</strong> this is not a physically measured result.</p></section>`,
     connections: `<section id="construction-connections" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Authoritative netlist</p><h2>Wire-by-wire connections</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${dynamicSupplyText(row[0],preset)}</strong></td><td>${row.slice(1,-2).map((cell)=>dynamicSupplyText(cell,preset)).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${dynamicSupplyText(row.at(-1),preset)}</td></tr>`).join("")}</tbody></table></div></section>`,
     pinouts: `<section id="construction-pinouts" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Manufacturer sources</p><h2>Package orientation and pins</h2></div><span>Top view · confirm notch before power</span></div>${pinouts}</section>`,
-    assembly: `<section id="construction-assembly" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Guided physical build</p><h2>Assemble with power disconnected</h2></div><span>Follow, verify, and check one step at a time</span></div>${assemblyTutorial(preset)}</section>`
+    assembly: `<section id="construction-assembly" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Guided physical build</p><h2>Assemble with power disconnected</h2></div><span>Follow, verify, and check one step at a time</span></div>${assemblyTutorial(preset)}</section>`,
+    synths: synthReferenceView()
   };
   panel.innerHTML = views[state.constructionView] || views.breadboard;
   panel.style.setProperty("--workspace-zoom", String(state.workspaceZoom / 100));
@@ -1748,6 +2058,8 @@ function bindEvents() {
   document.addEventListener("click", (event) => {
     const add = event.target.closest("[data-add]");
     if (add) return addModule(add.dataset.add);
+    const nudge = event.target.closest("[data-module-nudge]");
+    if (nudge) return nudgeModule(Number(nudge.dataset.moduleId), nudge.dataset.moduleNudge);
     const select = event.target.closest("[data-select]");
     if (select) { state.selectedId = Number(select.dataset.select); renderChain(); renderInspector(); return; }
     const bypass = event.target.closest("[data-bypass]");
@@ -1786,6 +2098,42 @@ function bindEvents() {
     if (["demo", "tone", "microphone"].includes(state.source)) $("#hardware-source-select").value = state.source;
     $("#file-label").hidden = state.source !== "file";
     if (state.audioOn) await startSource();
+  });
+  $("#sequencer-start").addEventListener("click", startSequencerTransport);
+  $("#sequencer-stop").addEventListener("click", stopSequencerTransport);
+  $("#synth-profile").addEventListener("change", async (event) => {
+    state.synthProfile = event.target.value;
+    state.synthWaveform = SYNTH_PROFILES[state.synthProfile].wave;
+    $("#synth-waveform").value = state.synthWaveform;
+    if (state.sequencerRunning) await startSource();
+  });
+  $("#synth-waveform").addEventListener("change", async (event) => { state.synthWaveform = event.target.value; if (state.sequencerRunning) await startSource(); });
+  $("#arp-mode").addEventListener("change", (event) => { state.arpMode = event.target.value; });
+  $("#midi-bpm").addEventListener("change", async (event) => { state.midiBpm = clamp(Number(event.target.value)||120,30,300); event.target.value=state.midiBpm; if(state.sequencerRunning) await startSource(); });
+  $("#step-division").addEventListener("change", async (event) => { state.stepDivision=Number(event.target.value); if(state.sequencerRunning) await startSource(); });
+  $("#pattern-duration").addEventListener("change", (event) => { state.patternDuration=clamp(Number(event.target.value)||0,0,5); event.target.value=state.patternDuration; });
+  $("#start-delay").addEventListener("change", (event) => { state.startDelay=event.target.value; });
+  $$("[data-pattern-bar]").forEach((button)=>button.addEventListener("click",()=>{state.sequencerBar=Number(button.dataset.patternBar);renderSequencer();}));
+  $("#arp-grid").addEventListener("click", (event) => {
+    const cell=event.target.closest("[data-pattern-step]");
+    if(!cell) return;
+    const step=Number(cell.dataset.patternStep), note=Number(cell.dataset.patternNote);
+    state.sequencePattern[step]=state.sequencePattern[step]===note?null:note;
+    renderSequencer();
+  });
+  $("#apply-midi-pattern").addEventListener("click", applyMidiText);
+  $("#clear-midi-pattern").addEventListener("click",()=>{state.sequencePattern=Array(32).fill(null);renderSequencer();announce("Two-bar MIDI pattern cleared.");});
+  $(".performance-switches").addEventListener("click", (event) => {
+    const performance=event.target.closest("[data-performance]");
+    const quick=event.target.closest("[data-quick-effect]");
+    if(quick) return addModule(quick.dataset.quickEffect);
+    if(!performance) return;
+    const action=performance.dataset.performance;
+    if(action==="randomize") return randomizePattern(false);
+    if(action==="glitch") return randomizePattern(true);
+    state.performance[action]=!state.performance[action];
+    performance.setAttribute("aria-pressed",String(state.performance[action]));
+    if(action==="mute" && audio.sequencerVoice) audio.sequencerVoice.envelope.gain.setTargetAtTime(state.performance.mute?0:.03,audio.context.currentTime,.008);
   });
   $("#audio-file").addEventListener("change", async (event) => {
     const file = event.target.files[0];
@@ -2090,6 +2438,31 @@ function bindEvents() {
     const choice = event.target.closest("[data-catalog-choice]");
     if (choice) chooseCatalogItem(choice.dataset.catalogChoice);
   });
+  let draggedModuleId = null;
+  $("#signal-chain").addEventListener("keydown", (event) => {
+    const module = event.target.closest("[data-select]");
+    if (!module || event.target.closest("button") || !["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    state.selectedId = Number(module.dataset.select);
+    renderChain();
+    renderInspector();
+  });
+  $("#signal-chain").addEventListener("dragstart", (event) => {
+    const module=event.target.closest("[data-select]");
+    if(!module) return;
+    draggedModuleId=Number(module.dataset.select);
+    event.dataTransfer.effectAllowed="move";
+  });
+  $("#signal-chain").addEventListener("dragover", (event) => { if(event.target.closest("[data-select]")) event.preventDefault(); });
+  $("#signal-chain").addEventListener("drop", (event) => {
+    const target=event.target.closest("[data-select]");
+    if(!target || draggedModuleId==null) return;
+    event.preventDefault();
+    const from=state.modules.findIndex((item)=>item.id===draggedModuleId);
+    const to=state.modules.findIndex((item)=>item.id===Number(target.dataset.select));
+    if(from>=0&&to>=0&&from!==to){const [item]=state.modules.splice(from,1);state.modules.splice(to,0,item);renderStudio();rebuildAudioGraph();announce("Module moved in the serial signal chain.");}
+    draggedModuleId=null;
+  });
   $("#experiment-form").addEventListener("submit", (event) => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
@@ -2102,6 +2475,7 @@ function bindEvents() {
 
 renderLibrary();
 bindEvents();
+renderSequencer();
 renderHardware();
 loadHardwareSound();
 syncAudioButtons();
