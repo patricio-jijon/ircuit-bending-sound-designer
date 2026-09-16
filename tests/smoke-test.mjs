@@ -15,7 +15,7 @@ const [html, css, js, hardware, devices, readme] = await Promise.all([
 ]);
 
 assert.match(html, /<title>Circuit Bending Sound Designer<\/title>/);
-assert.match(html, /app\.js\?v=9/);
+assert.match(html, /app\.js\?v=10/);
 assert.match(html, /id="devices" class="view devices-view"/);
 assert.match(html, /id="planner-controller"/);
 assert.match(html, /id="device-catalog"/);
@@ -63,6 +63,9 @@ assert.match(js, /function suggestedDeviceConnection/);
 assert.match(js, /function openCatalogPicker/);
 assert.match(js, /function renderCatalogPicker/);
 assert.match(js, /event\.ctrlKey \|\| event\.metaKey/);
+assert.match(js, /function addHardwareSoundStage/);
+assert.match(js, /class="interactive-wire/);
+assert.match(js, /openCatalogPicker\("sound"/);
 assert.match(js, /state\.constructionView = button\.dataset\.construction/);
 assert.match(js, /contextmenu/);
 assert.match(js, /addEventListener\("click", openComponentMenuFromClick\)/);
@@ -86,6 +89,8 @@ assert.match(css, /Physical computing workspace/);
 assert.match(css, /grid-template-columns: 248px minmax\(520px, 1fr\) 310px/);
 assert.match(css, /Device compatibility planner/);
 assert.match(css, /\.catalog-picker::backdrop/);
+assert.match(css, /\.wire-hit/);
+assert.match(css, /\.sound-chain-panel/);
 assert.match(readme, /GitHub Pages/);
 
 console.log("Static smoke tests passed: structure, modules, accessibility hooks, audio limiter, purchasing, and STL export.");
