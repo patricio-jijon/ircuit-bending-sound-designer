@@ -18,7 +18,7 @@
   --octave: #bb91ff;
   --delay: #55d7a1;
   --glitch: #f3f4e9;
-  --header-height: 72px;
+  --header-height: 82px;
   font-family: "Aptos", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -51,7 +51,7 @@ a { color: inherit; }
   z-index: 20;
   height: var(--header-height);
   display: grid;
-  grid-template-columns: 270px 1fr auto;
+  grid-template-columns: 310px 1fr auto;
   align-items: center;
   border-bottom: 1px solid var(--line);
   background: rgba(98, 100, 102, .98);
@@ -73,10 +73,10 @@ a { color: inherit; }
 .brand small { font-size: .73rem; }
 
 .brand-mark {
-  width: 46px;
-  height: 46px;
+  width: 64px;
+  height: 64px;
   display: block;
-  flex: 0 0 46px;
+  flex: 0 0 64px;
   color: #fff;
 }
 
@@ -97,6 +97,9 @@ a { color: inherit; }
   font: 800 8px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 .brand-mark svg .pulse { stroke-width: 2.2; }
+.brand-mark { transition: filter .12s ease, transform .12s ease; }
+.brand-mark.is-sounding { filter: drop-shadow(0 0 8px #d8ff45); transform: scale(1.04); }
+.brand-mark.is-sounding svg circle { stroke: #d8ff45; }
 
 .tabs { justify-self: center; display: flex; gap: 2px; }
 .tab {
@@ -1038,7 +1041,7 @@ body h4,
 
 @media (max-width: 760px) {
   .app-header { background: rgba(98, 100, 102, .98); }
-  .brand-mark { width: 42px; height: 42px; flex-basis: 42px; }
+  .brand-mark { width: 52px; height: 52px; flex-basis: 52px; }
 }
 
 /* Realistic component and sound-engineering controls */
@@ -1187,6 +1190,41 @@ body h4,
 }
 
 /* Modular synth studio */
+.macro-panel { border-bottom: 1px solid #74787c; background: #34373a; }
+.macro-panel > header { min-height: 46px; display: flex; align-items: center; gap: 12px; padding: 7px 12px; border-bottom: 1px solid #62676b; }
+.macro-panel > header > div { display: flex; align-items: baseline; gap: 8px; margin-right: auto; }
+.macro-panel h2 { margin: 0; font-size: .72rem; text-transform: uppercase; }
+.macro-panel button { border: 1px solid #92989d; background: #222529; color: #fff; padding: 5px 8px; font-size: .58rem; }
+.macro-panel button[aria-pressed="true"] { border-color: #c989ff; background: #56316f; }
+.macro-panel kbd { padding: 2px 4px; border: 1px solid #888f95; background: #111316; font: 700 .55rem ui-monospace,monospace; }
+.macro-panel output { min-width: 190px; color: #fff; font: 650 .55rem ui-monospace,monospace; }
+.macro-knobs { display: grid; grid-template-columns: repeat(8,minmax(92px,1fr)); gap: 1px; background: #656a6e; }
+.macro-control { min-width: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px; padding: 8px 7px; background: #45494c; }
+.macro-control.is-armed { background: #503060; box-shadow: inset 0 0 0 1px #d3a3ff; }
+.macro-select { align-self: start; display: grid; gap: 2px; min-width: 36px; padding: 3px !important; }
+.macro-select span { font: 800 .58rem ui-monospace,monospace; }
+.macro-select small { font-size: .43rem; }
+.macro-control label { min-width: 0; display: grid; justify-items: center; gap: 3px; position: relative; }
+.macro-dial { position: relative; width: 45px; height: 45px; border: 2px solid #aeb4b8; border-radius: 50%; background: radial-gradient(circle at 37% 31%,#858b90 0 9%,#363a3d 48%,#17191b 100%); box-shadow: 0 2px 4px #0008; }
+.macro-dial i { position: absolute; left: 50%; top: 4px; width: 2px; height: 15px; background: #fff; transform-origin: 50% 18px; transform: translateX(-50%) rotate(var(--macro-angle)); }
+.macro-range { position: absolute; inset: 0; width: 100%; height: 45px; opacity: 0; }
+.macro-control label strong { width: 100%; overflow: hidden; color: #fff; font-size: .47rem; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.macro-assign-target,
+.parameter-map-target { display: none; border: 1px solid #d7a8ff !important; background: #60317e !important; color: #fff !important; box-shadow: 0 0 8px #a85ae477; }
+.midi-learn-mode .macro-assign-target { display: block; width: 100%; min-height: 25px; padding: 3px; font-size: .48rem; }
+.midi-learn-mode .parameter-map-target { display: inline-block; min-height: 24px; padding: 2px 6px; font-size: .48rem; }
+.voice-map-target { position: relative; z-index: 5; }
+.midi-learn-mode .effect-module { height: 205px; }
+.module-delete { width: 24px; height: 24px; margin-left: auto; padding: 0; border: 1px solid #899096; background: #272a2d; color: #fff; line-height: 1; }
+.module-delete:hover { border-color: var(--danger); color: var(--danger); }
+.effect-title { gap: 5px; }
+.voice-parameter-knobs { display: grid; grid-template-columns: repeat(6,minmax(90px,1fr)); gap: 1px; border-bottom: 1px solid #6d7276; background: #676b6f; }
+.voice-parameter-knobs label { position: relative; min-width: 0; display: grid; justify-items: center; gap: 3px; padding: 8px 5px; background: #494d50; color: #fff; }
+.voice-parameter-knobs label > span:first-child { font-size: .51rem; font-weight: 750; text-transform: uppercase; }
+.voice-dial { position: relative; width: 42px; height: 42px; border: 2px solid #9fa6ab; border-radius: 50%; background: radial-gradient(circle at 37% 31%,#858b90 0 9%,#363a3d 48%,#17191b 100%); }
+.voice-dial i { position: absolute; left: 50%; top: 4px; width: 2px; height: 14px; background: #d8ff45; transform-origin: 50% 17px; transform: translateX(-50%) rotate(var(--voice-angle)); }
+.voice-parameter-knobs input { position: absolute; inset: 24px 6px 18px; width: calc(100% - 12px); opacity: 0; }
+.voice-parameter-knobs output { font: 650 .48rem ui-monospace,monospace; }
 .modular-console { border-bottom: 1px solid var(--line); background: #44474a; }
 .modular-console-header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 16px; border-bottom: 1px solid #6c7074; }
 .modular-console-header > div:first-child { display: flex; align-items: baseline; gap: 9px; }
@@ -1257,6 +1295,7 @@ body h4,
 .synth-reference-boundary { margin: 0 0 14px; padding: 12px; border-left: 3px solid #fff; background: #56595c; color: #fff; font-size: .7rem; }
 .synth-explorer { display: grid; grid-template-columns: 250px minmax(620px,1fr); gap: 1px; background: var(--line); }
 .synth-reference-list { display: grid; align-content: start; gap: 1px; background: var(--line); }
+.synth-list-heading { padding: 9px 11px; background: #272a2d; color: #d8ff45; font: 800 .52rem ui-monospace,monospace; text-transform: uppercase; }
 .synth-reference-card { display: grid; gap: 4px; width: 100%; padding: 12px; border: 0; border-left: 3px solid transparent; border-radius: 0; background: #494c4f; color: #fff; text-align: left; }
 .synth-reference-card:hover,
 .synth-reference-card:focus-visible { background: #62666a; }
@@ -1264,6 +1303,8 @@ body h4,
 .synth-reference-card span { font: 800 .53rem ui-monospace, monospace; text-transform: uppercase; }
 .synth-reference-card strong { font-size: .72rem; }
 .synth-reference-card small { color: #fff; font-size: .53rem; line-height: 1.35; }
+.folder-component-preview { display: grid; grid-template-columns: repeat(2,1fr); gap: 3px; margin-bottom: 3px; padding: 4px; background: #eef0ec; }
+.folder-component-preview svg { width: 100%; height: 38px; }
 .synth-circuit-viewer { min-width: 0; padding: 16px; background: #5c5f62; }
 .synth-circuit-viewer header { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; }
 .synth-circuit-viewer header span { color: #fff; font: 800 .58rem ui-monospace, monospace; text-transform: uppercase; }
@@ -1289,16 +1330,35 @@ body h4,
 .synth-flow i { color: #d8ff45; font-style: normal; }
 .synth-circuit-viewer p { margin: 0; color: #fff; font-size: .68rem; }
 .synth-circuit-viewer a { display: inline-block; margin-top: 10px; color: #fff; font-size: .64rem; font-weight: 750; }
+.effect-circuit-actions { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+.effect-circuit-actions p { margin-right: auto; }
+.effect-circuit-actions button { flex: 0 0 auto; min-height: 34px; border: 1px solid #d8ff45; background: #30382a; color: #fff; padding: 6px 10px; font-size: .58rem; font-weight: 750; }
+.effect-component-grid { display: grid; grid-template-columns: repeat(3,minmax(150px,1fr)); gap: 1px; background: #777d81; }
+.effect-component-card { min-width: 0; display: grid; grid-template-columns: 72px 1fr auto; align-items: center; gap: 5px 8px; padding: 10px; background: #484c4f; color: #fff; }
+.effect-component-card > span { grid-column: 1 / -1; font-size: .55rem; font-weight: 750; text-transform: uppercase; }
+.effect-component-card svg { grid-row: 2 / span 2; width: 70px; height: 46px; }
+.effect-component-card input,
+.effect-component-card select { min-width: 0; width: 100%; }
+.effect-component-card output { font: 650 .5rem ui-monospace,monospace; }
+.effect-component-card small { grid-column: 2 / -1; font-size: .51rem; line-height: 1.35; }
+.effect-circuit-viewer .calculation-box { margin-top: 14px; }
 
 @media (max-width: 1180px) {
+  .macro-knobs { grid-template-columns: repeat(4,minmax(100px,1fr)); }
+  .voice-parameter-knobs { grid-template-columns: repeat(3,minmax(110px,1fr)); }
   .synth-control-strip { grid-template-columns: repeat(4,1fr); }
   .synth-keyboard-panel { grid-template-columns: 1fr; overflow-x: auto; }
   .sequencer-layout { grid-template-columns: 1fr; }
   .pattern-editor { overflow-x: auto; border-right: 0; border-bottom: 1px solid #707478; }
   .synth-explorer { grid-template-columns: 210px minmax(620px,1fr); overflow-x: auto; }
+  .effect-component-grid { grid-template-columns: repeat(2,minmax(180px,1fr)); }
 }
 
 @media (max-width: 650px) {
+  .macro-panel > header { align-items: flex-start; flex-wrap: wrap; }
+  .macro-panel output { min-width: 0; width: 100%; }
+  .macro-knobs { grid-template-columns: repeat(2,minmax(110px,1fr)); }
+  .voice-parameter-knobs { grid-template-columns: repeat(2,minmax(110px,1fr)); }
   .modular-console-header { align-items: flex-start; flex-direction: column; }
   .transport-controls { width: 100%; flex-wrap: wrap; }
   .synth-control-strip { grid-template-columns: repeat(2,1fr); }
@@ -1311,4 +1371,6 @@ body h4,
   .synth-circuit-viewer { padding: 12px; }
   .synth-circuit-viewer header { align-items: flex-start; flex-direction: column; }
   .synth-circuit-viewer header b { text-align: left; }
+  .effect-component-grid { grid-template-columns: 1fr; }
+  .effect-circuit-actions { align-items: stretch; flex-direction: column; }
 }
