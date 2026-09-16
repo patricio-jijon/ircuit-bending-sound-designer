@@ -37,6 +37,7 @@ GitHub will provide the public URL after deployment completes.
 - Tinkercad-inspired physical workspace with a searchable parts library, single breadboard/schematic canvas, contextual component inspector, zoom, and undo/redo
 - Device Planner with seven exact controller boards, twenty-five supported chips/devices, mixed-device selection, compatibility blockers, and suggested connection plans
 - Illustrated replacement browser with search, category and subcategory filters; opens from Change buttons or Ctrl-click on supported components
+- Direct component clicks open the matching replacement list; colored breadboard wires open a behavioral sound-stage library whose additions affect live browser audio
 - Resistor, capacitor, potentiometer, diode-material, and transistor-model exploration controls
 - STEM Center inventory status for stocked, unverified, and additional-purchase parts, with separate purchase estimate
 - Breadboard, schematic, connections, pinouts, and assembly are focused workspace views rather than one long document
