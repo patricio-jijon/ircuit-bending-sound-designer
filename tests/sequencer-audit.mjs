@@ -20,5 +20,9 @@ const patternSource = source.match(/sequencePattern: \[([^\]]+)\]/)?.[1];
 const pattern = Function(`return [${patternSource}]`)();
 assert.equal(pattern.length, 32, "Two 4/4 bars at sixteenth-note resolution require 32 steps");
 assert.equal((60000 / 120) / 4, 125, "120 BPM sixteenth-note interval must be 125 ms");
+assert.match(source, /gateSynthNote\(state\.performance\.mute \? null : note, sequenceIntervalMs\(\) \/ 1000 \* \.72/, "Each sequencer step must use a finite gate shorter than its interval");
+assert.match(source, /exponentialRampToValueAtTime\(\.0001/, "The step envelope must release to silence");
+assert.match(source, /state\.source === "sequencer"\) return \{ input, output, nodes \}/, "Chain oscillators must not drone over sequencer notes");
+assert.match(source, /for \(let note = 48; note <= 71; note \+= 1\)/, "Keyboard must provide two chromatic octaves");
 
-console.log("Sequencer audit passed: MIDI parsing, A4 tuning, 32-step pattern, and BPM timing.");
+console.log("Sequencer audit passed: MIDI parsing, A4 tuning, 32-step timing, finite note gates, and two-octave keyboard.");
