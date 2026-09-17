@@ -5,6 +5,8 @@ import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const source = await readFile(resolve(root, "app.js"), "utf8");
+const markup = await readFile(resolve(root, "index.html"), "utf8");
+const styles = await readFile(resolve(root, "styles.css"), "utf8");
 
 const noteParser = source.match(/function noteNameToMidi\(token\) \{[\s\S]*?\n\}/)?.[0];
 const frequencyFunction = source.match(/function midiFrequency\(note\) \{[\s\S]*?\n\}/)?.[0];
@@ -24,5 +26,12 @@ assert.match(source, /gateSynthNote\(state\.performance\.mute \? null : note, se
 assert.match(source, /exponentialRampToValueAtTime\(\.0001/, "The step envelope must release to silence");
 assert.match(source, /state\.source === "sequencer"\) return \{ input, output, nodes \}/, "Chain oscillators must not drone over sequencer notes");
 assert.match(source, /for \(let note = 48; note <= 71; note \+= 1\)/, "Keyboard must provide two chromatic octaves");
+assert.match(markup, /id="midi-tempo-station"/, "Visible MIDI tempo station must be present");
+assert.match(markup, /tempo-coach-figure/, "Tempo station must include the exercise figure");
+assert.match(source, /function syncTempoCoach\(bpm = state\.midiBpm\)/, "Tempo coach synchronization function must be present");
+assert.match(source, /60000 \/ safeBpm/, "Tempo coach must derive one animation beat from BPM");
+assert.match(styles, /animation-duration: var\(--tempo-beat-ms\)/, "Exercise motion must use the selected MIDI beat duration");
+assert.match(styles, /prefers-reduced-motion: reduce/, "Tempo coach must respect reduced-motion preferences");
+assert.match(styles, /--accent: #ffd43b;/, "Primary interface accent must use the approved yellow");
 
-console.log("Sequencer audit passed: MIDI parsing, A4 tuning, 32-step timing, finite note gates, and two-octave keyboard.");
+console.log("Sequencer audit passed: MIDI parsing, timing, finite gates, keyboard range, and BPM-synced tempo coach.");
