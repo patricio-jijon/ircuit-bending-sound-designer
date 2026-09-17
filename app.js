@@ -2039,6 +2039,20 @@ function holePoint(hole) {
   return { x: 54 + (col - 1) * 24, y: ys[letter] };
 }
 
+function placementValueLabel(preset, part) {
+  if (part.valueKey) {
+    return hardwareValueLabel(
+      preset.controls.find((item) => item.key === part.valueKey),
+      preset.values[part.valueKey]
+    );
+  }
+  if (part.label && part.label !== part.ref) return part.label;
+  const component = preset.components.find((item) =>
+    item.ref.split(",").map((ref) => ref.trim()).includes(part.ref)
+  );
+  return String(component?.value || part.label || "").replace(/,\s*.*/, "");
+}
+
 function breadboardSvg(preset) {
   let holes = "";
   for (let col = 1; col <= 30; col++) {
@@ -2057,7 +2071,7 @@ function breadboardSvg(preset) {
       return `<g data-help-key="${part.kind}" tabindex="0"><rect x="${x}" y="218" width="${width}" height="38" class="board-ic"/><path d="M${x} 229q13 8 0 16" class="symbol"/><circle cx="${x+10}" cy="226" r="3" class="board-pin-one"/><text x="${x+width/2}" y="244" text-anchor="middle" class="board-label">${part.ref} ${part.label}</text>${pinLabels}</g>`;
     }
     const a=holePoint(part.from), b=holePoint(part.to), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-    const value = part.valueKey ? hardwareValueLabel(preset.controls.find((item) => item.key === part.valueKey), preset.values[part.valueKey]) : part.label;
+    const value = placementValueLabel(preset, part);
     if (part.kind === "resistor") {
       const bands = resistorBands(value).map(([name,color],index)=>`<rect class="board-resistor-band" x="${mx-14+index*7}" y="${my-8}" width="4" height="16" style="fill:${color}"><title>${name}</title></rect>`).join("");
       return interactiveSvgGroup(part, `<g><path d="M${a.x} ${a.y}L${mx-22} ${my}m44 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-22}" y="${my-8}" width="44" height="16" rx="6" class="board-resistor"/>${bands}<text x="${mx}" y="${my-12}" text-anchor="middle" class="board-label">${part.ref} ${value}</text></g>`);

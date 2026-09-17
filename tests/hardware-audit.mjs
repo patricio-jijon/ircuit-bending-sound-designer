@@ -42,6 +42,12 @@ for (const [key, preset] of Object.entries(window.HARDWARE_PRESETS)) {
   }
   for (const placement of preset.placements) {
     if (placement.valueKey) assert(preset.controls.some((control) => control.key === placement.valueKey), `${key}: placement ${placement.ref} has unknown value key`);
+    if (!placement.valueKey && placement.label === placement.ref) {
+      assert(
+        preset.components.some((component) => component.ref.split(",").map((ref) => ref.trim()).includes(placement.ref) && component.value),
+        `${key}: placement ${placement.ref} would repeat its reference instead of showing a value`
+      );
+    }
   }
   for (const pinoutKey of preset.pinouts) {
     const pinout = window.HARDWARE_PINOUTS[pinoutKey];

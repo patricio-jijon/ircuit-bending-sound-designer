@@ -69,6 +69,7 @@ assert.match(js, /navigator\.mediaDevices\.getUserMedia/);
 assert.match(js, /amazon\.com\/s\?k=/);
 assert.match(js, /solid circuit_bending_enclosure/);
 assert.match(js, /function breadboardSvg/);
+assert.match(js, /function placementValueLabel/);
 assert.match(js, /function schematicSvg/);
 assert.match(js, /function syncAudioButtons/);
 assert.match(js, /function inventoryMatch/);
