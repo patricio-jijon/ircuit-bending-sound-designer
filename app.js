@@ -538,6 +538,15 @@ function sequenceIntervalMs() {
   return (60000 / state.midiBpm) / state.stepDivision;
 }
 
+function syncTempoCoach(bpm = state.midiBpm) {
+  const safeBpm = clamp(Number(bpm) || state.midiBpm, 30, 300);
+  const beatMs = 60000 / safeBpm;
+  const station = $("#midi-tempo-station");
+  if (station) station.style.setProperty("--tempo-beat-ms", `${beatMs}ms`);
+  const readout = $("#tempo-motion-label");
+  if (readout) readout.textContent = `${Math.round(beatMs)} ms / beat`;
+}
+
 function randomizePattern(glitch = false) {
   const density = glitch ? .72 : .48;
   state.sequencePattern = Array.from({length:32},(_,index) => Math.random() < density ? SEQUENCER_ROWS[(index + Math.floor(Math.random() * SEQUENCER_ROWS.length)) % SEQUENCER_ROWS.length] + (glitch && Math.random() > .76 ? 12 : 0) : null);
@@ -2475,7 +2484,8 @@ function bindEvents() {
   $("#synth-waveform").addEventListener("change", async (event) => { state.synthWaveform = event.target.value; if (state.sequencerRunning) await startSource(); });
   $("#voice-parameter-knobs").addEventListener("input",(event)=>{const control=event.target.closest("[data-voice-param]");if(control)updateVoiceParameter(control.dataset.voiceParam,control.value);});
   $("#arp-mode").addEventListener("change", (event) => { state.arpMode = event.target.value; });
-  $("#midi-bpm").addEventListener("change", async (event) => { state.midiBpm = clamp(Number(event.target.value)||120,30,300); event.target.value=state.midiBpm; if(state.sequencerRunning) await startSource(); });
+  $("#midi-bpm").addEventListener("input", (event) => syncTempoCoach(event.target.value));
+  $("#midi-bpm").addEventListener("change", async (event) => { state.midiBpm = clamp(Number(event.target.value)||120,30,300); event.target.value=state.midiBpm; syncTempoCoach(); if(state.sequencerRunning) await startSource(); });
   $("#step-division").addEventListener("change", async (event) => { state.stepDivision=Number(event.target.value); if(state.sequencerRunning) await startSource(); });
   $("#pattern-duration").addEventListener("change", (event) => { state.patternDuration=clamp(Number(event.target.value)||0,0,5); event.target.value=state.patternDuration; });
   $("#start-delay").addEventListener("change", (event) => { state.startDelay=event.target.value; });
@@ -2897,6 +2907,7 @@ renderMacroPanel();
 renderVoiceControls();
 bindEvents();
 renderSequencer();
+syncTempoCoach();
 renderHardware();
 loadHardwareSound();
 syncAudioButtons();
