@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=24">
+  <link rel="stylesheet" href="styles.css?v=25">
   <script src="hardware-data.js?v=18" defer></script>
   <script src="devices-data.js?v=18" defer></script>
-  <script src="app.js?v=23" defer></script>
+  <script src="app.js?v=24" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -141,6 +141,11 @@
                       <span class="tempo-input-row"><input id="midi-bpm" type="number" min="30" max="300" value="120" aria-describedby="tempo-motion-label"><span>BPM</span></span>
                     </label>
                     <output id="tempo-motion-label" class="tempo-motion-label">500 ms / beat</output>
+                    <div class="tempo-presets" aria-label="Tempo presets">
+                      <button type="button" data-tempo-preset="120" data-tempo-label="Balanced">BALANCED<br><small>120 BPM</small></button>
+                      <button type="button" data-tempo-preset="125" data-tempo-label="House">HOUSE<br><small>125 BPM</small></button>
+                      <button type="button" data-tempo-preset="170" data-tempo-label="Drum & Bass">DRUM+BASS<br><small>170 BPM</small></button>
+                    </div>
                   </div>
                 </div>
               </div>
