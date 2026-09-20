@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=20">
+  <link rel="stylesheet" href="styles.css?v=21">
   <script src="hardware-data.js?v=18" defer></script>
   <script src="devices-data.js?v=18" defer></script>
-  <script src="app.js?v=19" defer></script>
+  <script src="app.js?v=20" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -79,26 +79,45 @@
               <label for="synth-profile">Voice<select id="synth-profile"><option value="osc-555">555 pulse oscillator</option><option value="werkstatt">Moog Werkstatt lead</option><option value="moog-bass">Moog ladder bass</option><option value="monotron">Korg monotron lead</option><option value="korg-delay">Korg delay dub</option><option value="microbrute">Arturia MicroBrute</option><option value="yamaha-fm">Yamaha FM bell</option><option value="yamaha-bass">Yamaha FM bass</option><option value="casio-pcm">Casio PCM-style</option></select></label>
               <label for="synth-waveform">Wave<select id="synth-waveform"><option value="sawtooth">Saw</option><option value="square">Square</option><option value="triangle">Triangle</option><option value="sine">Sine</option></select></label>
               <label for="arp-mode">Arpeggiator<select id="arp-mode"><option value="pattern">Pattern</option><option value="up">Up</option><option value="down">Down</option><option value="random">Random</option><option value="glitch">Glitch</option></select></label>
-              <div id="midi-tempo-station" class="midi-tempo-station" style="--tempo-beat-ms: 500ms">
-                <div class="tempo-coach" aria-hidden="true">
-                  <svg viewBox="0 0 64 64" focusable="false">
-                    <circle class="tempo-wave tempo-wave-one" cx="32" cy="31" r="24"/>
-                    <circle class="tempo-wave tempo-wave-two" cx="32" cy="31" r="24"/>
-                    <g class="tempo-coach-figure">
-                      <circle class="tempo-coach-head" cx="32" cy="12" r="5"/>
-                      <line class="tempo-coach-body" x1="32" y1="18" x2="32" y2="41"/>
-                      <line class="tempo-coach-arm tempo-coach-arm-left" x1="30" y1="24" x2="13" y2="10"/>
-                      <line class="tempo-coach-arm tempo-coach-arm-right" x1="34" y1="24" x2="51" y2="10"/>
-                      <line class="tempo-coach-leg tempo-coach-leg-left" x1="30" y1="40" x2="18" y2="59"/>
-                      <line class="tempo-coach-leg tempo-coach-leg-right" x1="34" y1="40" x2="46" y2="59"/>
-                    </g>
-                  </svg>
+              <div id="midi-tempo-station" class="midi-tempo-station tempo-mode-party" style="--tempo-beat-ms: 500ms; --tempo-turn: 0deg">
+                <div class="tempo-module-frame">
+                  <div class="tempo-stage" aria-hidden="true">
+                    <div class="tempo-stage-grid"></div>
+                    <svg class="tempo-character tempo-character-worm" viewBox="0 0 160 100" focusable="false">
+                      <path d="M15 66 C30 42 46 84 63 60 S96 42 113 63 S140 80 150 55" />
+                      <circle cx="151" cy="54" r="7"/><circle cx="154" cy="52" r="1.5" class="tempo-eye"/>
+                    </svg>
+                    <svg class="tempo-character tempo-character-ballad" viewBox="0 0 160 100" focusable="false">
+                      <g class="ballad-left"><circle cx="58" cy="26" r="8"/><path d="M57 34 L52 66 L36 91 M52 66 L67 91 M54 43 L74 53"/></g>
+                      <g class="ballad-right"><circle cx="93" cy="25" r="8"/><path d="M92 33 L96 66 L84 92 M96 66 L109 91 M92 43 L73 53"/></g>
+                    </svg>
+                    <svg class="tempo-character tempo-character-party" viewBox="0 0 160 100" focusable="false">
+                      <g class="party-a"><circle cx="46" cy="24" r="7"/><path d="M46 31 L44 61 L29 90 M44 61 L59 90 M44 42 L25 27 M46 41 L67 25"/></g>
+                      <g class="party-b"><circle cx="83" cy="22" r="7"/><path d="M83 29 L82 61 L70 91 M82 61 L97 89 M81 40 L67 52 M84 40 L103 48"/></g>
+                      <g class="party-c"><circle cx="120" cy="25" r="7"/><path d="M120 32 L118 62 L105 90 M118 62 L133 90 M117 43 L99 31 M121 42 L139 29"/></g>
+                    </svg>
+                    <svg class="tempo-character tempo-character-horse" viewBox="0 0 160 100" focusable="false">
+                      <path d="M31 56 C45 36 78 34 101 45 L123 40 L141 49 L132 58 L111 58 C98 72 77 75 56 68 L43 87 M67 67 L59 92 M96 64 L109 88 M117 57 L132 73"/>
+                      <path d="M33 56 L19 47 L28 39"/>
+                    </svg>
+                    <svg class="tempo-character tempo-character-eagle" viewBox="0 0 160 100" focusable="false">
+                      <path d="M80 49 C60 32 38 22 13 28 C31 39 43 50 54 62 C38 60 26 63 18 72 C42 70 61 67 80 56 C99 67 118 70 142 72 C134 63 122 60 106 62 C117 50 129 39 147 28 C122 22 100 32 80 49 Z"/>
+                      <path d="M80 49 L88 42 L84 54 Z"/>
+                    </svg>
+                    <div class="tempo-stage-caption"><span id="tempo-motion-name">Dance party</span><small id="tempo-motion-range">100–149 BPM</small></div>
+                  </div>
+                  <div class="tempo-control-deck">
+                    <span class="control-label">MIDI TEMPO</span>
+                    <div id="tempo-knob" class="tempo-knob" role="slider" tabindex="0" aria-label="MIDI tempo" aria-valuemin="30" aria-valuemax="300" aria-valuenow="120">
+                      <span class="tempo-knob-indicator"></span>
+                      <span class="tempo-knob-center">BPM</span>
+                    </div>
+                    <label class="midi-tempo-field" for="midi-bpm">
+                      <span class="tempo-input-row"><input id="midi-bpm" type="number" min="30" max="300" value="120" aria-describedby="tempo-motion-label"><span>BPM</span></span>
+                    </label>
+                    <output id="tempo-motion-label" class="tempo-motion-label">500 ms / beat</output>
+                  </div>
                 </div>
-                <label class="midi-tempo-field" for="midi-bpm">
-                  <span class="control-label">MIDI tempo</span>
-                  <span class="tempo-input-row"><input id="midi-bpm" type="number" min="30" max="300" value="120" aria-describedby="tempo-motion-label"><span>BPM</span></span>
-                </label>
-                <output id="tempo-motion-label" class="tempo-motion-label">500 ms / beat</output>
               </div>
               <label for="step-division">Rate<select id="step-division"><option value="4">1/16</option><option value="2">1/8</option><option value="8">1/32</option></select></label>
               <label for="pattern-duration">Run time<input id="pattern-duration" type="number" min="0" max="5" step="0.25" value="0"><span>min · 0 loops</span></label>
