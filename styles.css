@@ -1605,3 +1605,27 @@ body h4,
 .test-grid{width:100%;border-collapse:collapse;background:#f4f4f1;color:#17191b}.test-grid th,.test-grid td{padding:10px;border-bottom:1px solid #c9cbcd;vertical-align:top}.test-grid th{background:#e2e3e0;color:#202224}.test-grid td strong{color:#111}
 .test-boundary{margin:14px 0 0;padding:12px;border-left:3px solid #ffd43b;background:#434649;color:#fff;font-size:.78rem}.selected-part-test{margin-top:12px;padding:12px;border:1px dashed #bfc2c4;background:#4d5053}.selected-part-test strong{color:#ffd43b}
 @media(max-width:800px){.main-service-strip{align-items:flex-start;flex-direction:column}.test-bench-summary{grid-template-columns:1fr}}
+
+/* v23 studio performance controls */
+.arp-octave-control,.global-octave-control{display:grid;grid-template-columns:auto 34px minmax(90px,1fr) 34px auto;gap:7px;align-items:center;padding:9px;border:1px solid #8f9295;background:#4b4e51}
+.global-octave-control{grid-template-columns:auto minmax(100px,1fr) auto}
+.arp-octave-control>span,.global-octave-control>span{font:800 .65rem ui-monospace,monospace;color:#fff;letter-spacing:.06em}
+.arp-octave-control button{height:34px;border:1px solid #fff;background:#34373a;color:#fff;font-size:1.1rem}
+.arp-octave-control output,.global-octave-control output{font:800 .68rem ui-monospace,monospace;color:#ffd43b;white-space:nowrap}
+.tempo-knob{position:relative;overflow:hidden}
+.tempo-knob-animation{position:absolute;inset:17%;display:grid;place-items:center;border-radius:50%;pointer-events:none}
+.tempo-knob-character{display:none;width:100%;height:100%;fill:none;stroke:#ffd43b;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;animation:tempoKnobMove var(--tempo-beat-ms,500ms) ease-in-out infinite alternate}
+.tempo-knob-character circle{fill:#ffd43b;stroke:none}
+.tempo-mode-worm .tempo-knob-worm,.tempo-mode-ballad .tempo-knob-ballad,.tempo-mode-party .tempo-knob-party,.tempo-mode-horse .tempo-knob-horse,.tempo-mode-eagle .tempo-knob-eagle{display:block}
+.tempo-knob-center{position:relative;z-index:3;background:#3d4043;padding:2px 4px;border-radius:2px}
+@keyframes tempoKnobMove{from{transform:translateY(2px) rotate(-3deg)}to{transform:translateY(-2px) rotate(3deg)}}
+.kaoss-panel{margin:12px 0 18px;border:1px solid #96999c;background:#4b4e51;padding:14px;box-shadow:inset 0 0 0 3px #55585b}
+.kaoss-heading{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:10px}.kaoss-heading h3{margin:0;font-size:1rem}.kaoss-heading p{margin:0;color:#e2e3e4;font-size:.74rem}
+.kaoss-layout{display:grid;grid-template-columns:minmax(300px,1fr) 230px;gap:12px}
+.kaoss-pad{position:relative;min-height:230px;border:2px solid #fff;background:#26292c;overflow:hidden;cursor:crosshair;touch-action:none}
+.kaoss-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.12) 1px,transparent 1px);background-size:10% 10%}
+.kaoss-pad::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at var(--kaoss-x,50%) var(--kaoss-y,50%),rgba(255,212,59,.28),transparent 26%);pointer-events:none}
+.kaoss-cursor{position:absolute;left:var(--kaoss-x,50%);top:var(--kaoss-y,50%);width:24px;height:24px;border:2px solid #ffd43b;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 18px #ffd43b;pointer-events:none}
+.kaoss-axis{position:absolute;color:#fff;font:800 .6rem ui-monospace,monospace;letter-spacing:.08em;pointer-events:none}.kaoss-axis-x{right:8px;bottom:6px}.kaoss-axis-y{left:7px;top:7px;writing-mode:vertical-rl;transform:rotate(180deg)}
+.kaoss-readout{display:flex;flex-direction:column;gap:9px;padding:12px;border:1px solid #7f8285;background:#3c3f42}.kaoss-readout strong{color:#ffd43b}.kaoss-readout output{font:.72rem ui-monospace,monospace}.kaoss-readout button{margin-top:auto;min-height:38px;border:1px solid #fff;background:transparent;color:#fff;font-weight:800}
+@media(max-width:850px){.kaoss-layout{grid-template-columns:1fr}.kaoss-readout{min-height:150px}.arp-octave-control,.global-octave-control{grid-column:1/-1}}
