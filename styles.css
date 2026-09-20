@@ -1586,3 +1586,22 @@ body h4,
   .midi-tempo-station{grid-column:1/-1;min-width:0}
   .tempo-module-frame{grid-template-columns:1fr 135px}
 }
+
+/* v22 circuit-bending core workflow */
+.circuit-test-button,.main-service-actions button,.inline-circuit-test{min-height:38px;border:1px solid #ffd43b;background:#ffd43b;color:#171a1d;padding:8px 13px;font-weight:850;border-radius:4px}
+.main-service-strip{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:14px 28px;border-bottom:1px solid #9a9da0;background:#595c5f;box-shadow:inset 4px 0 0 #ffd43b}
+.main-service-strip>div:first-child{display:grid;grid-template-columns:auto auto;column-gap:12px;align-items:baseline}
+.main-service-strip strong{font-size:.95rem}.main-service-strip p{grid-column:1/-1;margin:3px 0 0;color:#f0f1f2;font-size:.76rem}
+.main-service-actions{display:flex;gap:8px;flex:0 0 auto}.main-service-actions button:first-child{background:transparent;color:#fff;border-color:#fff}
+.graphic-heading .inline-circuit-test{margin-left:auto}.part-change-button.is-inspect{border-color:#d4d7da;color:#fff}
+.circuit-test-dialog{width:min(860px,calc(100vw - 32px));max-height:86vh;padding:0;border:1px solid #a4a7aa;background:#55585b;color:#fff;box-shadow:0 22px 70px rgba(0,0,0,.42)}
+.circuit-test-dialog::backdrop{background:rgba(0,0,0,.55);backdrop-filter:blur(3px)}
+.circuit-test-dialog>header{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid #8e9194;background:#46494c}
+.circuit-test-dialog header span{color:#ffd43b;font:800 .66rem ui-monospace,monospace;text-transform:uppercase}.circuit-test-dialog h2{margin:2px 0 0;font-size:1.35rem}
+.circuit-test-dialog header button{width:36px;height:36px;border:1px solid #fff;background:transparent;color:#fff;font-size:1.3rem}
+.circuit-test-content{padding:18px;overflow:auto}.test-bench-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.test-bench-summary article{padding:12px;border:1px solid #8e9194;background:#4a4d50}.test-bench-summary span{display:block;color:#d7dade;font-size:.68rem;text-transform:uppercase}
+.test-bench-summary strong{display:block;margin-top:4px;font:800 1rem ui-monospace,monospace;color:#ffd43b}
+.test-grid{width:100%;border-collapse:collapse;background:#f4f4f1;color:#17191b}.test-grid th,.test-grid td{padding:10px;border-bottom:1px solid #c9cbcd;vertical-align:top}.test-grid th{background:#e2e3e0;color:#202224}.test-grid td strong{color:#111}
+.test-boundary{margin:14px 0 0;padding:12px;border-left:3px solid #ffd43b;background:#434649;color:#fff;font-size:.78rem}.selected-part-test{margin-top:12px;padding:12px;border:1px dashed #bfc2c4;background:#4d5053}.selected-part-test strong{color:#ffd43b}
+@media(max-width:800px){.main-service-strip{align-items:flex-start;flex-direction:column}.test-bench-summary{grid-template-columns:1fr}}
