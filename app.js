@@ -1712,7 +1712,7 @@ function renderHardwareControls() {
         : `<input id="hardware-${control.key}" type="range" min="${control.min}" max="${control.max}" step="${control.step}" value="${preset.values[control.key]}" data-hardware-key="${control.key}"><div class="engineering-options" aria-label="Common values">${engineeringChoices(control).map((option) => `<button type="button" data-inspector-choice="${option.value}"${String(option.value) === String(preset.values[control.key]) ? ` aria-pressed="true"` : ""}>${option.label}</button>`).join("")}</div>`}
       <p class="inspector-note">${control.unit === "%" ? "This changes the control position during the behavioral simulation." : "Choose a supported value. The drawing, calculation, BOM, and sound target stay synchronized."}</p>
       <button class="browse-replacements" type="button" data-browse-hardware="${state.hardwareSelectedIndex}">Browse illustrated replacements</button>
-    </div>` : `<div class="locked-component"><strong>Fixed in this verified preset</strong><p>This part has no approved substitution in the current circuit model. Its identity, polarity, package, and rating remain locked so the audited wiring stays valid.</p></div>`;
+    </div>` : `<div class="locked-component"><strong>Fixed identity in this verified preset</strong><p>This part is still selectable and testable. Its package, polarity, or role is locked because changing it without a verified model could make the wiring or math incorrect.</p><button class="browse-replacements" type="button" data-test-selected-part>Test this part in circuit</button></div>`;
   $("#hardware-controls").innerHTML = `<div class="selected-part-summary">
       <div class="selected-part-icon">${componentIcon(component || "dip8", preset)}</div>
       <div><span>${component?.ref || "Preset"}</span><h3>${component?.name || preset.name}</h3><strong>${value}</strong><p>${component?.note || preset.summary}</p></div>
@@ -1928,7 +1928,7 @@ function renderIllustratedBom() {
     const selected = index === state.hardwareSelectedIndex;
     return `<article class="part-item${selected ? " is-selected" : ""}" role="button" tabindex="0" data-help-key="${component.kind}" data-component-index="${index}"${control ? ` data-component-key="${control.key}"` : ""} data-component-ref="${component.ref}" aria-label="Inspect ${component.ref}, ${component.name}, ${componentValue(component, preset)}">
       <div class="part-icon">${componentIcon(component, preset)}</div>
-      <div><span>${component.ref} · qty ${component.qty}</span><strong>${component.name}</strong><p>${componentValue(component, preset)}</p><small>${hardwarePartSubcategory(component)} · ${control ? "editable" : "verified fixed part"}</small><span class="stock-badge ${stock.className}">${stock.label}</span>${control ? `<button class="part-change-button" type="button" data-hardware-change="${index}">Change</button>` : ""}</div>
+      <div><span>${component.ref} · qty ${component.qty}</span><strong>${component.name}</strong><p>${componentValue(component, preset)}</p><small>${hardwarePartSubcategory(component)} · ${control ? "editable" : "verified fixed part"}</small><span class="stock-badge ${stock.className}">${stock.label}</span>${control ? `<button class="part-change-button" type="button" data-hardware-change="${index}">Change</button>` : `<button class="part-change-button is-inspect" type="button" data-hardware-inspect="${index}">Inspect</button>`}</div>
     </article>`;
   });
   $("#illustrated-components").innerHTML = items.join("") || `<p class="empty-parts">No parts match “${state.partsFilter}”.</p>`;
@@ -2685,6 +2685,10 @@ function bindEvents() {
     switchHardwareCircuit(event.target.value);
   });
   $("#browse-circuits").addEventListener("click", () => openCatalogPicker("circuit"));
+  $("#test-current-circuit").addEventListener("click", openCircuitTest);
+  $("#close-circuit-test").addEventListener("click", () => $("#circuit-test-dialog").close());
+  $("#focus-parts-library").addEventListener("click", () => { $("#parts-search").focus(); $("#parts-search").scrollIntoView({behavior:"smooth",block:"center"}); });
+  document.addEventListener("click", (event) => { if (event.target.closest("[data-test-circuit]")) openCircuitTest(); });
   $("#supply-select").addEventListener("change", (event) => applyHardwareChoice("supply", event.target.value));
   $("#knob-style").addEventListener("change", (event) => {
     state.knobStyle = event.target.value;
@@ -2719,7 +2723,20 @@ function bindEvents() {
     state.hardwarePartSubcategory = event.target.value;
     renderIllustratedBom();
   });
+  $("#illustrated-components").addEventListener("click", (event) => {
+    const action = event.target.closest("[data-hardware-change],[data-hardware-inspect]");
+    if (!action) return;
+    event.stopPropagation();
+    const index = Number(action.dataset.hardwareChange ?? action.dataset.hardwareInspect);
+    const component = hardwarePreset().components[index];
+    const control = component?.valueKey ? hardwarePreset().controls.find((item)=>item.key===component.valueKey) : null;
+    selectHardwarePart(index, control?.key || "", component?.ref || "");
+    if (action.hasAttribute("data-hardware-change") && control) openCatalogPicker("hardware", index);
+    else renderHardwareControls();
+  });
   $("#hardware-controls").addEventListener("click", (event) => {
+    const testSelected = event.target.closest("[data-test-selected-part]");
+    if (testSelected) return openCircuitTest();
     const addSound = event.target.closest("[data-browse-sound-stages]");
     if (addSound) return openCatalogPicker("sound");
     const removeSound = event.target.closest("[data-remove-sound-stage]");
