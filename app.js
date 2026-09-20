@@ -244,6 +244,10 @@ const state = {
   synthWaveform: "square",
   voiceParams: {cutoff:9000,resonance:1,attack:2,release:12,fmAmount:0,subMix:0},
   arpMode: "pattern",
+  arpOctave: 0,
+  globalOctave: 0,
+  kaossX: 0.5,
+  kaossY: 0.5,
   midiBpm: 120,
   stepDivision: 4,
   patternDuration: 0,
@@ -517,12 +521,15 @@ function applyMidiText() {
 function sequenceNoteForStep(step) {
   const active = state.sequencePattern.filter((note) => note != null);
   if (!active.length) return null;
-  if (state.arpMode === "up") return [...new Set(active)].sort((a,b)=>a-b)[step % new Set(active).size];
-  if (state.arpMode === "down") return [...new Set(active)].sort((a,b)=>b-a)[step % new Set(active).size];
-  if (state.arpMode === "random") return active[Math.floor(Math.random() * active.length)];
-  const note = state.sequencePattern[step];
-  if (state.arpMode === "glitch" && note != null && Math.random() > .62) return clamp(note + (Math.random() > .5 ? 12 : -12), 0, 127);
-  return note;
+  let note = null;
+  if (state.arpMode === "up") note = [...new Set(active)].sort((a,b)=>a-b)[step % new Set(active).size];
+  else if (state.arpMode === "down") note = [...new Set(active)].sort((a,b)=>b-a)[step % new Set(active).size];
+  else if (state.arpMode === "random") note = active[Math.floor(Math.random() * active.length)];
+  else {
+    note = state.sequencePattern[step];
+    if (state.arpMode === "glitch" && note != null && Math.random() > .62) note += Math.random() > .5 ? 12 : -12;
+  }
+  return note == null ? null : clamp(note + (state.arpOctave + state.globalOctave) * 12, 0, 127);
 }
 
 function triggerSequenceStep() {
@@ -672,12 +679,12 @@ function formatValue(param, value) {
 function calculateModule(instance) {
   const p = instance.params;
   if (instance.type === "oscillator") {
-    const frequency = 1.44 / (((p.r1 + 2 * p.r2) * 1000) * (p.c * 1e-9));
-    const second = 1.44 / (((p.r1 + 2 * p.r2b) * 1000) * (p.c * 1e-9));
+    const frequency = 1 / (0.693 * ((p.r1 + 2 * p.r2) * 1000) * (p.c * 1e-9));
+    const second = 1 / (0.693 * ((p.r1 + 2 * p.r2b) * 1000) * (p.c * 1e-9));
     return {
       title: "Astable timing frequency",
-      formula: "f ≈ 1.44 ÷ ((R1 + 2R2) × C)",
-      substitution: `1.44 ÷ ((${p.r1} kΩ + 2 × ${p.r2} kΩ) × ${p.c} nF)`,
+      formula: "T = 0.693(R1 + 2R2)C; f = 1/T",
+      substitution: `1 ÷ [0.693 × (${p.r1} kΩ + 2 × ${p.r2} kΩ) × ${p.c} nF]`,
       result: `${frequency.toFixed(1)} Hz${p.voices === "dual" ? ` + ${second.toFixed(1)} Hz second voice` : ""}`,
       why: "Raising either timing resistance or capacitance increases the charge time, so pitch falls. This is a calculated NE555 astable estimate; real tolerances shift it. The audible browser model is limited to 12 kHz.",
       frequency,
@@ -943,12 +950,52 @@ function refreshCalculation(instance) {
     <p class="formula">${calculation.formula}</p><p>${calculation.substitution}</p><p><strong>${calculation.result}</strong></p><p>${calculation.why}</p>`;
 }
 
+function selectedModulePrimaryParameter() {
+  const instance = state.modules.find((item)=>item.id===state.selectedId);
+  if (!instance) return null;
+  const definition = MODULES[instance.type];
+  const key = PRIMARY_PARAMETERS[instance.type] || definition.params.find((param)=>param.type!=="select")?.key;
+  const parameter = definition.params.find((param)=>param.key===key && param.type!=="select");
+  return parameter ? {instance,parameter} : null;
+}
+
+function applyKaossPosition(x,y,render=true) {
+  state.kaossX=clamp(Number(x),0,1); state.kaossY=clamp(Number(y),0,1);
+  const cutoff=80+state.kaossX*(12000-80);
+  updateVoiceParameter("cutoff",cutoff);
+  const target=selectedModulePrimaryParameter();
+  if(target){
+    const p=target.parameter;
+    const value=p.min+state.kaossY*(p.max-p.min);
+    target.instance.params[p.key]=Number((Math.round(value/p.step)*p.step).toFixed(6));
+    rebuildAudioGraph(); renderChain(); renderBom();
+    if(render) renderInspector();
+  }
+  const pad=$("#kaoss-pad");
+  if(pad){pad.style.setProperty("--kaoss-x",(state.kaossX*100)+"%");pad.style.setProperty("--kaoss-y",((1-state.kaossY)*100)+"%");}
+  const xOut=$("#kaoss-x-value"); if(xOut)xOut.textContent=`X · ${Math.round(state.kaossX*100)}% · cutoff ${Math.round(cutoff).toLocaleString()} Hz`;
+  const yOut=$("#kaoss-y-value"); if(yOut)yOut.textContent=target?`Y · ${Math.round(state.kaossY*100)}% · ${target.parameter.label}: ${formatValue(target.parameter,target.instance.params[target.parameter.key])}`:`Y · ${Math.round(state.kaossY*100)}% · select an effect`;
+  const targetOut=$("#kaoss-target"); if(targetOut)targetOut.textContent=target?`Selected module: ${MODULES[target.instance.type].name} #${target.instance.id}`:"Selected module: none";
+}
+
+function renderKaossPad() { applyKaossPosition(state.kaossX,state.kaossY,false); }
+
+function setArpOctave(value) {
+  state.arpOctave=clamp(Math.round(Number(value)||0),-3,3);
+  $("#arp-octave").value=state.arpOctave; $("#arp-octave-value").textContent=(state.arpOctave>0?"+":"")+state.arpOctave+" oct";
+}
+function setGlobalOctave(value) {
+  state.globalOctave=clamp(Math.round(Number(value)||0),-2,2);
+  $("#global-octave").value=state.globalOctave; $("#global-octave-value").textContent=(state.globalOctave>0?"+":"")+state.globalOctave+" oct";
+}
+
 function renderStudio() {
   renderMacroPanel();
   renderChain();
   renderInspector();
   renderLessons();
   renderBom();
+  renderKaossPad();
 }
 
 function renderLessons() {
@@ -2525,7 +2572,7 @@ function bindEvents() {
     const assign = event.target.closest("[data-assign-module]");
     if (assign && state.midiLearnMode) return assignMacroToParameter(Number(assign.dataset.assignModule),assign.dataset.assignParam);
     const select = event.target.closest("[data-select]");
-    if (select) { state.selectedId = Number(select.dataset.select); renderChain(); renderInspector(); return; }
+    if (select) { state.selectedId = Number(select.dataset.select); renderChain(); renderInspector(); renderKaossPad(); return; }
     const bypass = event.target.closest("[data-bypass]");
     if (bypass) {
       const instance = state.modules.find((item) => item.id === Number(bypass.dataset.bypass));
@@ -2538,6 +2585,22 @@ function bindEvents() {
   });
 
   $("#midi-learn-toggle").addEventListener("click",()=>toggleMidiLearn());
+  $("#arp-octave").addEventListener("input",(event)=>setArpOctave(event.target.value));
+  $("#arp-octave-down").addEventListener("click",()=>setArpOctave(state.arpOctave-1));
+  $("#arp-octave-up").addEventListener("click",()=>setArpOctave(state.arpOctave+1));
+  $("#global-octave").addEventListener("input",(event)=>setGlobalOctave(event.target.value));
+  $("#kaoss-reset").addEventListener("click",()=>applyKaossPosition(.5,.5));
+  const updateKaossFromPointer=(event)=>{
+    const pad=$("#kaoss-pad"), rect=pad.getBoundingClientRect();
+    applyKaossPosition((event.clientX-rect.left)/rect.width,1-(event.clientY-rect.top)/rect.height,false);
+  };
+  $("#kaoss-pad").addEventListener("pointerdown",(event)=>{event.currentTarget.setPointerCapture(event.pointerId);updateKaossFromPointer(event);});
+  $("#kaoss-pad").addEventListener("pointermove",(event)=>{if(event.currentTarget.hasPointerCapture(event.pointerId))updateKaossFromPointer(event);});
+  $("#kaoss-pad").addEventListener("keydown",(event)=>{
+    const delta=.04; let x=state.kaossX,y=state.kaossY;
+    if(event.key==="ArrowLeft")x-=delta; else if(event.key==="ArrowRight")x+=delta; else if(event.key==="ArrowDown")y-=delta; else if(event.key==="ArrowUp")y+=delta; else return;
+    event.preventDefault();applyKaossPosition(x,y,false);
+  });
   $("#macro-knobs").addEventListener("click",(event)=>{
     const select=event.target.closest("[data-macro-select]");
     if(!select) return;
