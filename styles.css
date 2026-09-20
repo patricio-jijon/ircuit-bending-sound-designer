@@ -1629,3 +1629,15 @@ body h4,
 .kaoss-axis{position:absolute;color:#fff;font:800 .6rem ui-monospace,monospace;letter-spacing:.08em;pointer-events:none}.kaoss-axis-x{right:8px;bottom:6px}.kaoss-axis-y{left:7px;top:7px;writing-mode:vertical-rl;transform:rotate(180deg)}
 .kaoss-readout{display:flex;flex-direction:column;gap:9px;padding:12px;border:1px solid #7f8285;background:#3c3f42}.kaoss-readout strong{color:#ffd43b}.kaoss-readout output{font:.72rem ui-monospace,monospace}.kaoss-readout button{margin-top:auto;min-height:38px;border:1px solid #fff;background:transparent;color:#fff;font-weight:800}
 @media(max-width:850px){.kaoss-layout{grid-template-columns:1fr}.kaoss-readout{min-height:150px}.arp-octave-control,.global-octave-control{grid-column:1/-1}}
+
+/* v24 vertical arpeggiator octave window */
+.arp-octave-control{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:88px;padding:8px 7px!important;background:#44474a!important;border:1px solid #8f9295!important}
+.arp-octave-title{font:900 .62rem ui-monospace,monospace!important;letter-spacing:.08em;color:#fff!important}
+.arp-octave-window{position:relative;width:66px;height:154px;border:2px solid #202326;background:#292c2f;overflow:hidden;box-shadow:inset 0 0 16px rgba(0,0,0,.55)}
+.arp-octave-scale{position:absolute;left:7px;top:7px;bottom:7px;display:flex;flex-direction:column;justify-content:space-between;z-index:2;pointer-events:none}
+.arp-octave-scale span{font:800 .58rem ui-monospace,monospace;color:#d8dade;line-height:1}
+.arp-octave-slider{position:absolute;z-index:4;right:-42px;top:68px;width:140px;height:18px;margin:0;transform:rotate(-90deg);transform-origin:center;accent-color:#ffd43b;cursor:ns-resize}
+.arp-octave-slot{position:absolute;right:10px;top:10px;bottom:10px;width:13px;border:1px solid #737679;background:#16191b;pointer-events:none}
+.arp-octave-slot i{position:absolute;left:-5px;top:var(--arp-octave-position,50%);width:21px;height:9px;transform:translateY(-50%);background:#ffd43b;border:1px solid #fff;box-shadow:0 0 10px rgba(255,212,59,.65)}
+.arp-octave-step{width:66px;height:27px!important;min-height:27px;border:1px solid #8f9295!important;background:#34373a!important;color:#ffd43b!important;font-size:.72rem!important;padding:0!important}
+.arp-octave-control output{min-height:18px;font:900 .67rem ui-monospace,monospace!important;color:#ffd43b!important}
