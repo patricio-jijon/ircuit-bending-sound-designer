@@ -1752,6 +1752,59 @@ function hardwareCalculation(preset) {
   return `<span>Calculated RC estimate · ${v.supply} V supply</span><strong>${rate.toFixed(1)} Hz · approximately ${v.supply} V logic swing</strong><code>f ≈ 1 / (2.2 × ${v.clockR} kΩ × ${v.clockC} µF)</code><p>The 2.2 factor is an estimate. CD40106 thresholds vary with supply, device, temperature, and part tolerance, so physical rate will differ.</p>`;
 }
 
+function hardwareTestReport(preset = hardwarePreset()) {
+  const v = preset.values;
+  if (preset.id === "dual555") {
+    const calc = (rb) => {
+      const raOhm=v.r1*1000, rbOhm=rb*1000, cF=v.c*1e-9;
+      const tHigh=0.693*(raOhm+rbOhm)*cF, tLow=0.693*rbOhm*cF, period=tHigh+tLow;
+      return {f:1/period,duty:(tHigh/period)*100};
+    };
+    const a=calc(v.r2), b=calc(v.r2b);
+    return {headline:"Dual NE555 calculated bench test",metrics:[["Supply",v.supply+" V DC"],["Voice A",a.f.toFixed(1)+" Hz"],["Voice B",b.f.toFixed(1)+" Hz"]],rows:[
+      ["U1/U2 pin 8 to pin 1","DC volts","about "+v.supply+" V","Power and ground are present"],
+      ["U1 timing node pins 2/6","Oscilloscope",(v.supply/3).toFixed(1)+"–"+(2*v.supply/3).toFixed(1)+" V ramp","Timing capacitor moves between about 1/3 and 2/3 VCC"],
+      ["U1 pin 3","Oscilloscope","square wave near "+a.f.toFixed(1)+" Hz · "+a.duty.toFixed(1)+"% high","Voice A timing network"],
+      ["U2 pin 3","Oscilloscope","square wave near "+b.f.toFixed(1)+" Hz · "+b.duty.toFixed(1)+"% high","Voice B timing network"],
+      ["P1 / P2","Listen / scope","frequency changes independently","Potentiometers change RB in the astable equation"],
+      ["P3 / output","AC volts / audio","level changes; oscillator frequency stays the same","Output level after the oscillator mix"]
+    ]};
+  }
+  if (preset.id === "opampFuzz") {
+    const gain=v.rf/v.rin, fc=1/(2*Math.PI*10000*v.toneC*1e-9);
+    const clip=v.diode==="germanium"?0.3:v.diode==="led"?1.8:v.diode==="schottky"?0.35:0.7;
+    return {headline:"TL072 fuzz calculated bench test",metrics:[["Supply",v.supply+" V DC"],["Bias",(v.supply/2).toFixed(2)+" V"],["Gain ratio",gain.toFixed(1)+"×"]],rows:[
+      ["U1 pin 8 to pin 4","DC volts","about "+v.supply+" V","Op-amp supply present"],
+      ["VBIAS / reference","DC volts","about "+(v.supply/2).toFixed(2)+" V","Single-supply signal reference"],
+      ["Gain stage","Scope / ratio","ideal magnitude about "+gain.toFixed(1)+"× before clipping","Rf/Rin relationship"],
+      ["D1/D2 clip region","Oscilloscope","simplified conduction near ±"+clip.toFixed(2)+" V","Actual current and device behavior shift this"],
+      ["Tone node","Frequency sweep","corner near "+fc.toFixed(0)+" Hz","10 kΩ with selected tone capacitor"],
+      ["Output level","AC volts / audio","level changes without changing calculated tone corner","P1 final level"]
+    ]};
+  }
+  const rate=1/(2.2*v.clockR*1000*v.clockC*1e-6);
+  return {headline:"40106 glitch clock calculated bench test",metrics:[["Supply",v.supply+" V DC"],["Clock estimate",rate.toFixed(1)+" Hz"],["Depth",v.depth+"%"]],rows:[
+    ["CD40106 supply pins","DC volts","about "+v.supply+" V","Power is present"],
+    ["RC timing node","Oscilloscope","charging/discharging waveform between Schmitt thresholds","Thresholds vary by device and supply"],
+    ["Clock output","Oscilloscope","roughly "+rate.toFixed(1)+" Hz","RC estimate; physical value will vary"],
+    ["Depth control","Listen / scope","more or less chopped signal","Behavioral mix control"],
+    ["Output","Audio / scope","gated or stepped waveform","Confirm no harmful DC reaches external audio input"]
+  ]};
+}
+
+function openCircuitTest() {
+  const preset=hardwarePreset(), report=hardwareTestReport(preset), component=selectedHardwareComponent(preset);
+  $("#circuit-test-title").textContent=preset.name+" · Test bench";
+  $("#circuit-test-content").innerHTML=
+    '<div class="test-bench-summary">'+report.metrics.map(([label,value])=>'<article><span>'+label+'</span><strong>'+value+'</strong></article>').join("")+'</div>'+
+    '<p class="evidence-label">'+report.headline+'</p>'+
+    '<div class="connection-table-wrap"><table class="test-grid"><thead><tr><th>Test point</th><th>Tool</th><th>Expected result</th><th>What it checks</th></tr></thead><tbody>'+
+    report.rows.map((row)=>'<tr><td><strong>'+row[0]+'</strong></td><td>'+row[1]+'</td><td>'+row[2]+'</td><td>'+row[3]+'</td></tr>').join("")+
+    '</tbody></table></div><div class="selected-part-test"><strong>Selected part: '+(component?.ref||"none")+' · '+(component?.name||"")+'</strong><p>'+(component?.note||"Select a component to inspect its role before testing.")+'</p></div>'+
+    '<p class="test-boundary"><strong>Important:</strong> these are calculated or expected checkpoints, not measurements from your physical circuit. Disconnect power before rewiring. Use a current-limited DC supply and verify polarity, rail continuity, package orientation, and common ground before power-up.</p>';
+  $("#circuit-test-dialog").showModal();
+}
+
 function hardwarePartSubcategory(component) {
   const names = {breadboard:"Boards",dip8:"Integrated circuits",dip14:"Integrated circuits",resistor:"Resistors",capacitor:"Capacitors",electrolytic:"Capacitors",pot:"Potentiometers",diode:"Diodes",jack:"Connectors",supply:"Power"};
   return names[component.kind] || "Other";
