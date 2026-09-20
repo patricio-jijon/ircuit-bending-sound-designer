@@ -1736,11 +1736,11 @@ function syncAudioButtons() {
 function hardwareCalculation(preset) {
   const v = preset.values;
   if (preset.id === "dual555") {
-    const f = 1.44 / (((v.r1 + 2 * v.r2) * 1000) * (v.c * 1e-9));
-    const f2 = 1.44 / (((v.r1 + 2 * v.r2b) * 1000) * (v.c * 1e-9));
+    const f = 1 / (0.693 * ((v.r1 + 2 * v.r2) * 1000) * (v.c * 1e-9));
+    const f2 = 1 / (0.693 * ((v.r1 + 2 * v.r2b) * 1000) * (v.c * 1e-9));
     const dutyA = ((v.r1 + v.r2) / (v.r1 + 2 * v.r2)) * 100;
     const dutyB = ((v.r1 + v.r2b) / (v.r1 + 2 * v.r2b)) * 100;
-    return `<span>Calculated NE555 timing · ${v.supply} V supply</span><strong>Voice A ${f.toFixed(1)} Hz (${dutyA.toFixed(1)}% high) · Voice B ${f2.toFixed(1)} Hz (${dutyB.toFixed(1)}% high)</strong><code>f ≈ 1.44 / ((RA + 2RB)C)<br>fA = 1.44 / ((${v.r1} kΩ + 2×${v.r2} kΩ) × ${v.c} nF)</code><p>The ideal frequency equation is nearly supply-independent because the thresholds track 1/3 and 2/3 VCC. Supply voltage mainly changes output swing; tolerance, leakage, and threshold variation shift physical pitch.</p>`;
+    return `<span>Calculated NE555 timing · ${v.supply} V supply</span><strong>Voice A ${f.toFixed(1)} Hz (${dutyA.toFixed(1)}% high) · Voice B ${f2.toFixed(1)} Hz (${dutyB.toFixed(1)}% high)</strong><code>T = 0.693(RA + 2RB)C; f = 1/T<br>fA = 1 / [0.693 × (${v.r1} kΩ + 2×${v.r2} kΩ) × ${v.c} nF]</code><p>The ideal frequency equation is nearly supply-independent because the thresholds track 1/3 and 2/3 VCC. Supply voltage mainly changes output swing; tolerance, leakage, and threshold variation shift physical pitch.</p>`;
   }
   if (preset.id === "opampFuzz") {
     const gain = v.rf / v.rin;
@@ -1917,9 +1917,19 @@ function engineeringChoices(control) {
   return [...new Set(values)].map((value) => ({ value: String(value), label: hardwareValueLabel(control, value) }));
 }
 
+function hardwareComponentIndexForRef(ref, preset = hardwarePreset()) {
+  const wanted = String(ref || "").split(",").map((item)=>item.trim()).filter(Boolean);
+  return preset.components.findIndex((component)=>{
+    const refs = String(component.ref || "").split(",").map((item)=>item.trim());
+    return wanted.some((item)=>refs.includes(item)) || refs.some((item)=>wanted.includes(item));
+  });
+}
+
 function interactiveSvgGroup(part, inner) {
-  if (!part.valueKey) return inner;
-  return `<g class="interactive-component${state.hardwareSelectedKey === part.valueKey ? " is-selected" : ""}" data-help-key="${part.kind}" data-component-key="${part.valueKey}" data-component-ref="${part.ref}" role="button" tabindex="0" aria-label="Inspect ${part.ref}. Click, tap, or press Enter."><title>${part.ref}: click or tap to inspect this component</title>${inner}</g>`;
+  const index = hardwareComponentIndexForRef(part.ref);
+  const component = index >= 0 ? hardwarePreset().components[index] : null;
+  const key = part.valueKey || component?.valueKey || "";
+  return `<g class="interactive-component${key && state.hardwareSelectedKey === key ? " is-selected" : ""}" data-help-key="${part.kind}" data-component-index="${index}"${key ? ` data-component-key="${key}"` : ""} data-component-ref="${part.ref}" role="button" tabindex="0" aria-label="Inspect ${part.ref}. Click, tap, or press Enter."><title>${part.ref}: inspect this component${key ? " and choose supported values" : ""}</title>${inner}</g>`;
 }
 
 function renderPotControls(preset) {
