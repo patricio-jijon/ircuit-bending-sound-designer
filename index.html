@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=25">
+  <link rel="stylesheet" href="styles.css?v=26">
   <script src="hardware-data.js?v=18" defer></script>
   <script src="devices-data.js?v=18" defer></script>
-  <script src="app.js?v=24" defer></script>
+  <script src="app.js?v=25" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -67,6 +67,7 @@
               <input id="audio-file" type="file" accept="audio/*" hidden>
               <label class="volume-field" for="master-volume">Output <output id="master-volume-value">70%</output></label>
               <input id="master-volume" type="range" min="0" max="100" value="70">
+              <output id="audio-device-status" class="audio-device-status" aria-live="polite">Audio locked · tap Start audio</output>
             </div>
           </section>
 
