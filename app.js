@@ -982,7 +982,10 @@ function renderKaossPad() { applyKaossPosition(state.kaossX,state.kaossY,false);
 
 function setArpOctave(value) {
   state.arpOctave=clamp(Math.round(Number(value)||0),-3,3);
-  $("#arp-octave").value=state.arpOctave; $("#arp-octave-value").textContent=(state.arpOctave>0?"+":"")+state.arpOctave+" oct";
+  $("#arp-octave").value=state.arpOctave;
+  $("#arp-octave-value").textContent=(state.arpOctave>0?"+":"")+state.arpOctave+" oct";
+  const windowEl=$(".arp-octave-window");
+  if(windowEl) windowEl.style.setProperty("--arp-octave-position",((3-state.arpOctave)/6*100)+"%");
 }
 function setGlobalOctave(value) {
   state.globalOctave=clamp(Math.round(Number(value)||0),-2,2);
@@ -2586,6 +2589,7 @@ function bindEvents() {
 
   $("#midi-learn-toggle").addEventListener("click",()=>toggleMidiLearn());
   $("#arp-octave").addEventListener("input",(event)=>setArpOctave(event.target.value));
+  setArpOctave(state.arpOctave);
   $("#arp-octave-down").addEventListener("click",()=>setArpOctave(state.arpOctave-1));
   $("#arp-octave-up").addEventListener("click",()=>setArpOctave(state.arpOctave+1));
   $("#global-octave").addEventListener("input",(event)=>setGlobalOctave(event.target.value));
