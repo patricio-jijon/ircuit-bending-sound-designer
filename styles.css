@@ -1489,3 +1489,100 @@ body h4,
   .effect-component-grid { grid-template-columns: 1fr; }
   .effect-circuit-actions { align-items: stretch; flex-direction: column; }
 }
+
+
+/* v21 MIDI tempo performance module */
+.midi-tempo-station{
+  grid-column: span 2;
+  min-width: 330px;
+  padding: 0;
+  border: 1px solid #979a9d;
+  background: #4d5053;
+  box-shadow: inset 0 0 0 2px #5f6265, 0 8px 22px rgba(0,0,0,.18);
+}
+.tempo-module-frame{
+  display:grid;
+  grid-template-columns:minmax(180px,1.35fr) 150px;
+  min-height:158px;
+  border:3px solid #d7d9db;
+  background:#3f4245;
+  position:relative;
+}
+.tempo-module-frame::before,
+.tempo-module-frame::after{
+  content:""; position:absolute; width:7px; height:7px; border-radius:50%;
+  background:#242628; border:1px solid #b7babd; top:7px;
+}
+.tempo-module-frame::before{left:7px}.tempo-module-frame::after{right:7px}
+.tempo-stage{
+  position:relative;
+  overflow:hidden;
+  min-height:152px;
+  border-right:1px solid #909396;
+  background:#25282a;
+}
+.tempo-stage-grid{
+  position:absolute; inset:0;
+  background:
+    linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
+  background-size:16px 16px;
+}
+.tempo-stage::after{
+  content:""; position:absolute; left:10px; right:10px; bottom:34px; height:1px; background:#ffd43b;
+  box-shadow:0 -18px 0 rgba(255,212,59,.08),0 -36px 0 rgba(255,212,59,.05);
+}
+.tempo-character{
+  position:absolute; inset:12px 14px 35px; width:calc(100% - 28px); height:calc(100% - 47px);
+  display:none; overflow:visible;
+  stroke:#ffd43b; fill:#ffd43b; stroke-width:5; stroke-linecap:round; stroke-linejoin:round;
+  animation-duration:var(--tempo-beat-ms); animation-iteration-count:infinite; animation-timing-function:ease-in-out;
+  transform-origin:50% 80%;
+  filter:drop-shadow(0 0 5px rgba(255,212,59,.28));
+}
+.tempo-character .tempo-eye{stroke:none;fill:#25282a}
+.tempo-mode-worm .tempo-character-worm{display:block;animation-name:tempo-worm}
+.tempo-mode-ballad .tempo-character-ballad{display:block;animation-name:tempo-sway}
+.tempo-mode-party .tempo-character-party{display:block;animation-name:tempo-party}
+.tempo-mode-horse .tempo-character-horse{display:block;animation-name:tempo-gallop}
+.tempo-mode-eagle .tempo-character-eagle{display:block;animation-name:tempo-eagle}
+.tempo-character-ballad path,.tempo-character-ballad circle,
+.tempo-character-party path,.tempo-character-party circle{fill:none}
+.tempo-stage-caption{
+  position:absolute; left:10px; right:10px; bottom:6px; z-index:2; display:flex; justify-content:space-between; gap:8px;
+  color:#fff; font:700 .63rem ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.04em; text-transform:uppercase;
+}
+.tempo-stage-caption small{color:#d5d7d9;font-size:.58rem}
+.tempo-control-deck{
+  display:grid; place-items:center; align-content:center; gap:5px; padding:10px 12px; background:#55585b;
+}
+.tempo-control-deck .control-label{color:#fff;font:800 .66rem ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.08em}
+.tempo-knob{
+  --knob-size:92px;
+  width:var(--knob-size);height:var(--knob-size);border-radius:50%;position:relative;
+  background:radial-gradient(circle at 35% 30%,#8d9195 0 5%,#53575a 24%,#2d3032 60%,#17191a 100%);
+  border:4px solid #aeb2b5; box-shadow:inset 0 0 0 6px #3b3f42,0 4px 10px rgba(0,0,0,.35);
+  touch-action:none; cursor:ns-resize;
+}
+.tempo-knob:focus-visible{outline:3px solid #ffd43b;outline-offset:3px}
+.tempo-knob-indicator{
+  position:absolute;left:50%;top:8px;width:4px;height:27px;border-radius:3px;background:#ffd43b;
+  transform-origin:2px 38px;transform:translateX(-50%) rotate(var(--tempo-turn));
+  box-shadow:0 0 7px rgba(255,212,59,.6);
+}
+.tempo-knob-center{
+  position:absolute;inset:0;display:grid;place-items:center;color:#fff;font:800 .67rem ui-monospace,monospace;letter-spacing:.1em
+}
+.tempo-control-deck .midi-tempo-field{margin:0}
+.tempo-control-deck .tempo-input-row input{width:72px;text-align:center;font-weight:800}
+.tempo-control-deck .tempo-motion-label{font:650 .62rem ui-monospace,monospace;color:#f0f1f2}
+@keyframes tempo-worm{0%,100%{transform:translateX(-5px) scaleX(.92)}50%{transform:translateX(6px) scaleX(1.05) translateY(-3px)}}
+@keyframes tempo-sway{0%,100%{transform:rotate(-2deg) translateX(-2px)}50%{transform:rotate(2deg) translateX(3px)}}
+@keyframes tempo-party{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-8px) rotate(1deg)}}
+@keyframes tempo-gallop{0%,100%{transform:translateX(-5px) translateY(1px) scaleY(.98)}50%{transform:translateX(7px) translateY(-8px) scaleY(1.03)}}
+@keyframes tempo-eagle{0%,100%{transform:translateY(4px) scaleY(.92)}50%{transform:translateY(-7px) scaleY(1.07)}}
+@media (prefers-reduced-motion:reduce){.tempo-character{animation:none!important}}
+@media (max-width:900px){
+  .midi-tempo-station{grid-column:1/-1;min-width:0}
+  .tempo-module-frame{grid-template-columns:1fr 135px}
+}
