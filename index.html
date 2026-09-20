@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=23">
+  <link rel="stylesheet" href="styles.css?v=24">
   <script src="hardware-data.js?v=18" defer></script>
   <script src="devices-data.js?v=18" defer></script>
-  <script src="app.js?v=22" defer></script>
+  <script src="app.js?v=23" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -80,10 +80,16 @@
               <label for="synth-waveform">Wave<select id="synth-waveform"><option value="sawtooth">Saw</option><option value="square">Square</option><option value="triangle">Triangle</option><option value="sine">Sine</option></select></label>
               <label for="arp-mode">Arpeggiator<select id="arp-mode"><option value="pattern">Pattern</option><option value="up">Up</option><option value="down">Down</option><option value="random">Random</option><option value="glitch">Glitch</option></select></label>
               <div class="arp-octave-control">
-                <span>ARP OCTAVE</span>
-                <button id="arp-octave-down" type="button" aria-label="Arpeggiator octave down">−</button>
-                <input id="arp-octave" type="range" min="-3" max="3" step="1" value="0" aria-label="Arpeggiator octave shift">
-                <button id="arp-octave-up" type="button" aria-label="Arpeggiator octave up">+</button>
+                <span class="arp-octave-title">ARP OCTAVE</span>
+                <button id="arp-octave-up" class="arp-octave-step" type="button" aria-label="Arpeggiator octave up">▲</button>
+                <div class="arp-octave-window">
+                  <div class="arp-octave-scale" aria-hidden="true">
+                    <span>+3</span><span>+2</span><span>+1</span><span>0</span><span>−1</span><span>−2</span><span>−3</span>
+                  </div>
+                  <input id="arp-octave" class="arp-octave-slider" type="range" min="-3" max="3" step="1" value="0" orient="vertical" aria-label="Arpeggiator octave shift, vertical slider">
+                  <div class="arp-octave-slot" aria-hidden="true"><i></i></div>
+                </div>
+                <button id="arp-octave-down" class="arp-octave-step" type="button" aria-label="Arpeggiator octave down">▼</button>
                 <output id="arp-octave-value">0 oct</output>
               </div>
               <div class="global-octave-control">
