@@ -1181,6 +1181,7 @@ function gateSynthNote(note, gateSeconds = null, origin = "keyboard") {
 
 async function startKeyboardNote(note) {
   await ensureAudio();
+  if (audio.context?.state !== "running") await audio.context.resume();
   if (state.source !== "sequencer" || !audio.sequencerVoice) {
     stopSource();
     state.source = "sequencer";
@@ -1475,6 +1476,7 @@ async function toggleAudio() {
   state.audioStarting = true;
   try {
     await ensureAudio();
+    if (audio.context?.state !== "running") await audio.context.resume();
     state.audioOn = !state.audioOn;
     if (state.audioOn) {
       rebuildAudioGraph();
@@ -2655,6 +2657,13 @@ function bindEvents() {
   $("#arp-mode").addEventListener("change", (event) => { state.arpMode = event.target.value; });
   $("#midi-bpm").addEventListener("input", (event) => { state.midiBpm = clamp(Number(event.target.value)||120,30,300); syncTempoCoach(state.midiBpm); });
   $("#midi-bpm").addEventListener("change", async (event) => { setMidiTempo(event.target.value); if(state.sequencerRunning) await startSource(); });
+  $(".tempo-presets [data-tempo-preset]").forEach((button)=>button.addEventListener("click",async()=>{
+    const bpm=Number(button.dataset.tempoPreset);
+    setMidiTempo(bpm);
+    $(".tempo-presets button").forEach((item)=>item.classList.toggle("is-active",item===button));
+    announce(`${button.dataset.tempoLabel} tempo selected: ${bpm} BPM.`);
+    if(state.sequencerRunning) await startSource();
+  }));
   const tempoKnob = $("#tempo-knob");
   let tempoDrag = null;
   tempoKnob?.addEventListener("pointerdown", (event) => {
