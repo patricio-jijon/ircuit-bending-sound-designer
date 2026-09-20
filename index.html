@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=22">
+  <link rel="stylesheet" href="styles.css?v=23">
   <script src="hardware-data.js?v=18" defer></script>
   <script src="devices-data.js?v=18" defer></script>
-  <script src="app.js?v=21" defer></script>
+  <script src="app.js?v=22" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -79,6 +79,18 @@
               <label for="synth-profile">Voice<select id="synth-profile"><option value="osc-555">555 pulse oscillator</option><option value="werkstatt">Moog Werkstatt lead</option><option value="moog-bass">Moog ladder bass</option><option value="monotron">Korg monotron lead</option><option value="korg-delay">Korg delay dub</option><option value="microbrute">Arturia MicroBrute</option><option value="yamaha-fm">Yamaha FM bell</option><option value="yamaha-bass">Yamaha FM bass</option><option value="casio-pcm">Casio PCM-style</option></select></label>
               <label for="synth-waveform">Wave<select id="synth-waveform"><option value="sawtooth">Saw</option><option value="square">Square</option><option value="triangle">Triangle</option><option value="sine">Sine</option></select></label>
               <label for="arp-mode">Arpeggiator<select id="arp-mode"><option value="pattern">Pattern</option><option value="up">Up</option><option value="down">Down</option><option value="random">Random</option><option value="glitch">Glitch</option></select></label>
+              <div class="arp-octave-control">
+                <span>ARP OCTAVE</span>
+                <button id="arp-octave-down" type="button" aria-label="Arpeggiator octave down">−</button>
+                <input id="arp-octave" type="range" min="-3" max="3" step="1" value="0" aria-label="Arpeggiator octave shift">
+                <button id="arp-octave-up" type="button" aria-label="Arpeggiator octave up">+</button>
+                <output id="arp-octave-value">0 oct</output>
+              </div>
+              <div class="global-octave-control">
+                <span>GLOBAL OCTAVE</span>
+                <input id="global-octave" type="range" min="-2" max="2" step="1" value="0" aria-label="Global octave shift">
+                <output id="global-octave-value">0 oct</output>
+              </div>
               <div id="midi-tempo-station" class="midi-tempo-station tempo-mode-party" style="--tempo-beat-ms: 500ms; --tempo-turn: 0deg">
                 <div class="tempo-module-frame">
                   <div class="tempo-stage" aria-hidden="true">
@@ -110,6 +122,13 @@
                     <span class="control-label">MIDI TEMPO</span>
                     <div id="tempo-knob" class="tempo-knob" role="slider" tabindex="0" aria-label="MIDI tempo" aria-valuemin="30" aria-valuemax="300" aria-valuenow="120">
                       <span class="tempo-knob-indicator"></span>
+                      <span class="tempo-knob-animation" aria-hidden="true">
+                        <svg class="tempo-knob-character tempo-knob-worm" viewBox="0 0 80 80"><path d="M10 50 C20 36 29 61 39 48 S58 38 70 49"/></svg>
+                        <svg class="tempo-knob-character tempo-knob-ballad" viewBox="0 0 80 80"><g><circle cx="29" cy="22" r="5"/><path d="M29 28L27 49L17 66M27 49L37 66M28 35L41 40"/><circle cx="50" cy="22" r="5"/><path d="M50 28L52 49L44 66M52 49L61 66M50 35L40 40"/></g></svg>
+                        <svg class="tempo-knob-character tempo-knob-party" viewBox="0 0 80 80"><circle cx="40" cy="19" r="6"/><path d="M40 25L39 49L27 68M39 49L53 67M39 33L22 24M41 33L58 23"/></svg>
+                        <svg class="tempo-knob-character tempo-knob-horse" viewBox="0 0 80 80"><path d="M15 46C24 33 43 32 54 39L65 36L73 42L67 48L57 48C49 57 37 58 27 54L21 67M35 54L31 70M50 52L58 68"/></svg>
+                        <svg class="tempo-knob-character tempo-knob-eagle" viewBox="0 0 80 80"><path d="M40 40C29 30 18 25 6 28C16 35 23 41 29 48C20 47 14 50 10 55C23 54 32 52 40 45C48 52 57 54 70 55C66 50 60 47 51 48C57 41 64 35 74 28C62 25 51 30 40 40Z"/></svg>
+                      </span>
                       <span class="tempo-knob-center">BPM</span>
                     </div>
                     <label class="midi-tempo-field" for="midi-bpm">
@@ -124,6 +143,21 @@
               <label for="start-delay">Start<select id="start-delay"><option value="0">Now</option><option value="1">1 second</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="bars">After 2 bars</option></select></label>
             </div>
             <div id="voice-parameter-knobs" class="voice-parameter-knobs" aria-label="Synth voice controls"></div>
+            <section class="kaoss-panel" aria-labelledby="kaoss-title">
+              <div class="kaoss-heading"><div><span class="section-number">XY</span><h3 id="kaoss-title">Signal touch pad</h3></div><p>Drag across the pad. X controls filter brightness; Y controls the selected module’s main sound parameter.</p></div>
+              <div class="kaoss-layout">
+                <div id="kaoss-pad" class="kaoss-pad" role="application" tabindex="0" aria-label="XY signal touch pad">
+                  <div class="kaoss-grid"></div><div id="kaoss-cursor" class="kaoss-cursor"></div>
+                  <span class="kaoss-axis kaoss-axis-x">FILTER →</span><span class="kaoss-axis kaoss-axis-y">EFFECT ↑</span>
+                </div>
+                <div class="kaoss-readout">
+                  <strong id="kaoss-target">Selected module: none</strong>
+                  <output id="kaoss-x-value">X · 50% · cutoff 6,040 Hz</output>
+                  <output id="kaoss-y-value">Y · 50% · effect center</output>
+                  <button id="kaoss-reset" type="button">Center pad</button>
+                </div>
+              </div>
+            </section>
             <section class="synth-keyboard-panel" aria-labelledby="synth-keyboard-title">
               <div><h3 id="synth-keyboard-title">Playable synth keyboard</h3><p>Press or hold a key to play the selected voice through the complete effect chain.</p></div>
               <div id="synth-keyboard" class="synth-keyboard" role="group" aria-label="Two-octave synthesizer keyboard"></div>
