@@ -1641,3 +1641,23 @@ body h4,
 .arp-octave-slot i{position:absolute;left:-5px;top:var(--arp-octave-position,50%);width:21px;height:9px;transform:translateY(-50%);background:#ffd43b;border:1px solid #fff;box-shadow:0 0 10px rgba(255,212,59,.65)}
 .arp-octave-step{width:66px;height:27px!important;min-height:27px;border:1px solid #8f9295!important;background:#34373a!important;color:#ffd43b!important;font-size:.72rem!important;padding:0!important}
 .arp-octave-control output{min-height:18px;font:900 .67rem ui-monospace,monospace!important;color:#ffd43b!important}
+
+/* v25 expressive tempo presets + street-art performance surface */
+.midi-tempo-station{position:relative;isolation:isolate;overflow:hidden}
+.midi-tempo-station:before,.midi-tempo-station:after{content:"";position:absolute;z-index:-1;pointer-events:none}
+.midi-tempo-station:before{inset:7px;background:repeating-linear-gradient(-12deg,transparent 0 25px,rgba(255,212,59,.08) 26px 28px),radial-gradient(circle at 14% 20%,rgba(255,255,255,.12) 0 2px,transparent 3px);transform:rotate(-1deg)}
+.midi-tempo-station:after{width:90px;height:42px;right:5px;bottom:8px;border:3px solid #ffd43b;border-radius:50%;transform:rotate(-13deg);opacity:.45}
+.tempo-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:9px}
+.tempo-presets button{min-height:46px;padding:5px 4px;border:2px solid #1e2022;background:#f0eee7;color:#151719;font:900 .61rem/1 ui-monospace,monospace;letter-spacing:.02em;box-shadow:3px 3px 0 #1e2022;transform:rotate(-1deg)}
+.tempo-presets button:nth-child(2){transform:rotate(1deg)}
+.tempo-presets button:nth-child(3){transform:rotate(-.4deg)}
+.tempo-presets button small{font-size:.56rem;color:#555}
+.tempo-presets button:hover,.tempo-presets button:focus-visible,.tempo-presets button.is-active{background:#ffd43b;transform:translate(-1px,-1px) rotate(0deg);box-shadow:5px 5px 0 #1e2022}
+.tempo-knob-character path,.tempo-knob-character circle,.tempo-knob-character line{stroke-linecap:round;stroke-linejoin:round}
+.tempo-knob-ballad g,.tempo-knob-party g{transform-box:fill-box;transform-origin:center}
+@media(max-width:720px){
+  .tempo-presets{grid-template-columns:1fr}
+  .tempo-presets button{min-height:42px}
+  .tempo-knob{touch-action:none}
+  #synth-keyboard [data-keyboard-note]{touch-action:none}
+}
