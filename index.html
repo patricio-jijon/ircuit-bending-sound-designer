@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Build combinable sound effects, hear component changes, and learn the circuit physics behind them.">
   <title>Circuit Bending Sound Designer</title>
-  <link rel="stylesheet" href="styles.css?v=21">
+  <link rel="stylesheet" href="styles.css?v=22">
   <script src="hardware-data.js?v=18" defer></script>
   <script src="devices-data.js?v=18" defer></script>
-  <script src="app.js?v=20" defer></script>
+  <script src="app.js?v=21" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to sound workspace</a>
@@ -269,6 +269,7 @@
           <select id="hardware-source-select" aria-label="Simulation sound source"><option value="demo">Built-in riff</option><option value="tone">Test tone</option><option value="microphone">Microphone / guitar interface</option></select>
           <button id="load-hardware-sound" class="secondary-button" type="button">Reset preset</button>
           <button id="hardware-audio-toggle" class="hardware-audio-toggle" type="button" aria-pressed="false">Start simulation</button>
+          <button id="test-current-circuit" class="circuit-test-button" type="button">Test circuit</button>
           <a id="download-guide" class="download-guide" href="guides/dual-555-drone-build-guide.pdf" download>Build guide</a>
           <button id="open-engineering-help" class="help-button" type="button">Help</button>
         </div>
@@ -278,6 +279,10 @@
         <strong id="hardware-selection-status">Verified preset ready</strong>
         <span id="hardware-audio-status">Behavioral sound model stopped</span>
         <span>9 V DC · calculated + browser-simulated · not physically tested</span>
+      </div>
+      <div class="main-service-strip" aria-label="Circuit bending workflow">
+        <div><span class="section-number">Main service</span><strong>Change a part → hear it → test it → build it</strong><p>Every visible part can be selected. Supported electrical values update the schematic, calculations, BOM, and behavioral sound model together.</p></div>
+        <div class="main-service-actions"><button id="focus-parts-library" type="button">Browse components</button><button type="button" data-test-circuit>Test current circuit</button></div>
       </div>
       <div class="hardware-layout">
         <aside class="parts-drawer" aria-labelledby="parts-drawer-title">
@@ -397,6 +402,10 @@
     </div>
     <p id="catalog-picker-help" class="catalog-picker-help">Choose a supported item. Exact pinouts and ratings still require verification.</p>
     <div id="catalog-picker-results" class="catalog-picker-results"></div>
+  </dialog>
+  <dialog id="circuit-test-dialog" class="circuit-test-dialog" aria-labelledby="circuit-test-title">
+    <header><div><span>Calculated test bench</span><h2 id="circuit-test-title">Circuit test</h2></div><button id="close-circuit-test" type="button" aria-label="Close circuit test">×</button></header>
+    <div id="circuit-test-content" class="circuit-test-content"></div>
   </dialog>
   <aside id="engineering-help" class="engineering-help" aria-labelledby="engineering-help-title" hidden>
     <header><div><span>Sound engineering help</span><h2 id="engineering-help-title">Circuit advice</h2></div><button id="close-engineering-help" type="button" aria-label="Close help">×</button></header>
