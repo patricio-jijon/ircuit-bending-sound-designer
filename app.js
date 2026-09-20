@@ -2046,13 +2046,24 @@ function finishPotTurn() {
 
 function schematicHotspots(preset) {
   const maps = {
-    dual555: [["R1", "r1", 55, 155, 125, 48], ["P1", "r2", 55, 204, 130, 48], ["C1", "c", 350, 345, 105, 58], ["R3", "r1", 480, 155, 125, 48], ["P2", "r2b", 480, 204, 135, 48], ["C3", "c", 775, 345, 105, 58], ["P3", "mix", 675, 392, 235, 48]],
-    opampFuzz: [["R3", "rin", 245, 365, 120, 65], ["R4", "rf", 335, 245, 110, 65], ["D1/D2", "diode", 335, 300, 125, 55], ["C4", "toneC", 660, 397, 100, 65], ["P1", "level", 748, 345, 185, 55]],
-    glitchClock: [["P1", "clockR", 365, 115, 210, 70], ["C1", "clockC", 45, 320, 125, 90], ["P2", "depth", 670, 215, 240, 70]]
+    dual555: [
+      ["U1", "", 180, 140, 200, 195], ["U2", "", 605, 140, 200, 195],
+      ["R1", "r1", 55, 155, 125, 48], ["P1", "r2", 55, 204, 130, 48], ["C1", "c", 350, 345, 105, 58],
+      ["R3", "r1", 480, 155, 125, 48], ["P2", "r2b", 480, 204, 135, 48], ["C3", "c", 775, 345, 105, 58], ["P3", "mix", 675, 392, 235, 48]
+    ],
+    opampFuzz: [
+      ["U1", "", 275, 220, 205, 225], ["R3", "rin", 245, 365, 120, 65], ["R4", "rf", 335, 245, 110, 65],
+      ["D1,D2", "diode", 335, 300, 125, 55], ["C4", "toneC", 660, 397, 100, 65], ["P1", "level", 748, 345, 185, 55]
+    ],
+    glitchClock: [
+      ["U1", "", 155, 140, 270, 225], ["P1", "clockR", 365, 115, 210, 70], ["C1", "clockC", 45, 320, 125, 90], ["P2", "depth", 670, 215, 240, 70]
+    ]
   };
-  return maps[preset.id].map(([ref,key,x,y,width,height]) => {
-    const helpKey = /^R/.test(ref) ? "resistor" : /^P/.test(ref) ? "pot" : /^C/.test(ref) ? "capacitor" : /^D/.test(ref) ? "diode" : "circuit";
-    return `<g class="interactive-component${state.hardwareSelectedKey === key ? " is-selected" : ""}" data-help-key="${helpKey}" data-component-key="${key}" data-component-ref="${ref}" role="button" tabindex="0" aria-label="Inspect ${ref}. Click, tap, or press Enter."><title>${ref}: click or tap to inspect this component</title><rect class="component-hitbox" x="${x}" y="${y}" width="${width}" height="${height}" rx="5"/></g>`;
+  return (maps[preset.id] || []).map(([ref,key,x,y,width,height]) => {
+    const helpKey = /^R/.test(ref) ? "resistor" : /^P/.test(ref) ? "pot" : /^C/.test(ref) ? "capacitor" : /^D/.test(ref) ? "diode" : /^U/.test(ref) ? "dip8" : "circuit";
+    const index = hardwareComponentIndexForRef(ref, preset);
+    const selected = index === state.hardwareSelectedIndex || (key && state.hardwareSelectedKey === key);
+    return `<g class="interactive-component${selected ? " is-selected" : ""}" data-help-key="${helpKey}" data-component-index="${index}"${key ? ` data-component-key="${key}"` : ""} data-component-ref="${ref}" role="button" tabindex="0" aria-label="Inspect ${ref}. Click, tap, or press Enter."><title>${ref}: inspect this part${key ? " and choose supported values" : ""}</title><rect class="component-hitbox" x="${x}" y="${y}" width="${width}" height="${height}" rx="5"/></g>`;
   }).join("");
 }
 
@@ -2168,7 +2179,7 @@ function breadboardSvg(preset) {
       const x = 54 + (part.col - 1) * 24 - 8;
       const width = (pins - 1) * 24 + 16;
       const pinLabels = Array.from({length:pins},(_,i)=>`<text x="${x+8+i*24}" y="253" text-anchor="middle">${i+1}</text><text x="${x+8+i*24}" y="228" text-anchor="middle">${pins*2-i}</text>`).join("");
-      return `<g data-help-key="${part.kind}" tabindex="0"><rect x="${x}" y="218" width="${width}" height="38" class="board-ic"/><path d="M${x} 229q13 8 0 16" class="symbol"/><circle cx="${x+10}" cy="226" r="3" class="board-pin-one"/><text x="${x+width/2}" y="244" text-anchor="middle" class="board-label">${part.ref} ${part.label}</text>${pinLabels}</g>`;
+      return interactiveSvgGroup(part, `<g><rect x="${x}" y="218" width="${width}" height="38" class="board-ic"/><path d="M${x} 229q13 8 0 16" class="symbol"/><circle cx="${x+10}" cy="226" r="3" class="board-pin-one"/><text x="${x+width/2}" y="244" text-anchor="middle" class="board-label">${part.ref} ${part.label}</text>${pinLabels}</g>`);
     }
     const a=holePoint(part.from), b=holePoint(part.to), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
     const value = placementValueLabel(preset, part);
@@ -2291,8 +2302,8 @@ function renderConstruction() {
     return `<section class="pinout-section"><h3>${item.identity}</h3><p>${item.orientation}</p><div class="connection-table-wrap"><table class="connection-table pinout-table"><thead><tr><th>Pin</th><th>Name</th><th>Role in this component</th></tr></thead><tbody>${item.pins.map(([number,name,role])=>`<tr><td>${number}</td><td><strong>${name}</strong></td><td>${role}</td></tr>`).join("")}</tbody></table></div><a href="${item.source}" target="_blank" rel="noopener noreferrer">Open manufacturer source ↗</a></section>`;
   }).join("");
   const views = {
-    breadboard: `<section id="construction-breadboard" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Physical layout</p><h2>${preset.name} breadboard</h2></div><span>Click a part to replace it · click a colored wire to add sound</span></div><div class="canvas-zoom-surface">${breadboardSvg(preset)}${renderPotControls(preset)}</div><p class="graphic-caption"><strong>Direct interaction:</strong> component lists change supported values. Wire clicks add behavioral sound stages; physical placement and wiring remain locked to the audited preset.</p></section>`,
-    schematic: `<section id="construction-schematic" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Electrical view</p><h2>${preset.name} schematic</h2></div><span>Highlighted targets share the component inspector</span></div><div class="canvas-zoom-surface">${schematicSvg(preset)}</div><p class="graphic-caption"><strong>Calculated and browser-simulated:</strong> this is not a physically measured result.</p></section>`,
+    breadboard: `<section id="construction-breadboard" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Physical layout</p><h2>${preset.name} breadboard</h2></div><span>Click any part to inspect it · editable values open the illustrated library</span><button class="inline-circuit-test" type="button" data-test-circuit>Test circuit</button></div><div class="canvas-zoom-surface">${breadboardSvg(preset)}${renderPotControls(preset)}</div><p class="graphic-caption"><strong>Main circuit-bending workflow:</strong> select a part, install a supported value, hear the behavioral result, then use Test circuit before building. Wire clicks can add behavioral sound stages; physical wiring stays locked to the audited preset.</p></section>`,
+    schematic: `<section id="construction-schematic" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Electrical view</p><h2>${preset.name} schematic</h2></div><span>Click highlighted parts to inspect them; editable parts open substitutions</span><button class="inline-circuit-test" type="button" data-test-circuit>Test circuit</button></div><div class="canvas-zoom-surface">${schematicSvg(preset)}</div><p class="graphic-caption"><strong>Calculated and browser-simulated:</strong> values, formulas, BOM, and supported sound parameters stay synchronized. This is not a physically measured result.</p></section>`,
     connections: `<section id="construction-connections" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Authoritative netlist</p><h2>Wire-by-wire connections</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${dynamicSupplyText(row[0],preset)}</strong></td><td>${row.slice(1,-2).map((cell)=>dynamicSupplyText(cell,preset)).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${dynamicSupplyText(row.at(-1),preset)}</td></tr>`).join("")}</tbody></table></div></section>`,
     pinouts: `<section id="construction-pinouts" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Manufacturer sources</p><h2>Package orientation and pins</h2></div><span>Top view · confirm notch before power</span></div>${pinouts}</section>`,
     assembly: `<section id="construction-assembly" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Guided physical build</p><h2>Assemble with power disconnected</h2></div><span>Follow, verify, and check one step at a time</span></div>${assemblyTutorial(preset)}</section>`,
@@ -2806,7 +2817,12 @@ function bindEvents() {
     const x = event.clientX || rect.left + Math.min(rect.width, 30);
     const y = event.clientY || rect.top + Math.min(rect.height, 30);
     openComponentMenu(component, x, y);
-    openCatalogPicker("hardware", state.hardwareSelectedIndex);
+    const selected = selectedHardwareComponent();
+    const selectedControl = selected?.valueKey
+      ? hardwarePreset().controls.find((item)=>item.key===selected.valueKey)
+      : null;
+    if (selectedControl) openCatalogPicker("hardware", state.hardwareSelectedIndex);
+    else announce(`${selected?.ref || "Component"} selected. Inspect its identity, role, pinout, and test checkpoints in the right panel.`);
   };
   $("#construction-panel").addEventListener("click", openComponentMenuFromClick);
   $("#construction-panel").addEventListener("pointerdown", (event) => {
