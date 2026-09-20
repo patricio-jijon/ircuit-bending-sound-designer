@@ -590,6 +590,7 @@ function randomizePattern(glitch = false) {
 }
 
 async function startSequencerTransport() {
+  primeAudioFromGesture();
   state.source = "sequencer";
   $("#source-select").value = "sequencer";
   await ensureAudio();
@@ -1047,27 +1048,62 @@ function renderBom() {
   $("#budget-total").textContent = `$${total.toFixed(2)}`;
 }
 
+function createAudioContextNow() {
+  if (audio.context) return audio.context;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) throw new Error("This browser does not support the Web Audio API.");
+  audio.context = new AudioContext();
+  audio.sourceBus = audio.context.createGain();
+  audio.master = audio.context.createGain();
+  audio.master.gain.value = Number($("#master-volume")?.value || 70) / 100;
+  audio.limiter = audio.context.createDynamicsCompressor();
+  audio.limiter.threshold.value = -12;
+  audio.limiter.knee.value = 3;
+  audio.limiter.ratio.value = 12;
+  audio.limiter.attack.value = 0.003;
+  audio.limiter.release.value = 0.2;
+  audio.analyser = audio.context.createAnalyser();
+  audio.analyser.fftSize = 2048;
+  audio.master.connect(audio.limiter);
+  audio.limiter.connect(audio.analyser);
+  audio.analyser.connect(audio.context.destination);
+  return audio.context;
+}
+
+function primeAudioFromGesture() {
+  const ctx = createAudioContextNow();
+  try {
+    const buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+  } catch (_) { /* unlock pulse is best-effort */ }
+  if (ctx.state !== "running") ctx.resume().catch(()=>{});
+  const status = $("#audio-device-status");
+  if (status) status.textContent = "Audio unlocked · ready";
+  return ctx;
+}
+
 async function ensureAudio() {
-  if (!audio.context) {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) throw new Error("This browser does not support the Web Audio API.");
-    audio.context = new AudioContext();
-    audio.sourceBus = audio.context.createGain();
-    audio.master = audio.context.createGain();
-    audio.master.gain.value = Number($("#master-volume").value) / 100;
-    audio.limiter = audio.context.createDynamicsCompressor();
-    audio.limiter.threshold.value = -12;
-    audio.limiter.knee.value = 3;
-    audio.limiter.ratio.value = 12;
-    audio.limiter.attack.value = 0.003;
-    audio.limiter.release.value = 0.2;
-    audio.analyser = audio.context.createAnalyser();
-    audio.analyser.fftSize = 2048;
-    audio.master.connect(audio.limiter);
-    audio.limiter.connect(audio.analyser);
-    audio.analyser.connect(audio.context.destination);
-  }
-  await audio.context.resume();
+  const ctx = createAudioContextNow();
+  if (ctx.state !== "running") await ctx.resume();
+  const status = $("#audio-device-status");
+  if (status) status.textContent = ctx.state === "running" ? "Audio engine running" : `Audio engine ${ctx.state}`;
+  return ctx;
+}
+
+function playAudioConfirmation() {
+  if (!audio.context || audio.context.state !== "running") return;
+  const ctx=audio.context;
+  const osc=ctx.createOscillator();
+  const gain=ctx.createGain();
+  osc.type="sine"; osc.frequency.value=523.25;
+  gain.gain.setValueAtTime(0.0001,ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.035,ctx.currentTime+0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.09);
+  osc.connect(gain); gain.connect(audio.master);
+  osc.start(ctx.currentTime); osc.stop(ctx.currentTime+0.1);
 }
 
 function stopSource() {
@@ -1180,6 +1216,7 @@ function gateSynthNote(note, gateSeconds = null, origin = "keyboard") {
 }
 
 async function startKeyboardNote(note) {
+  primeAudioFromGesture();
   await ensureAudio();
   if (audio.context?.state !== "running") await audio.context.resume();
   if (state.source !== "sequencer" || !audio.sequencerVoice) {
@@ -1475,16 +1512,19 @@ async function toggleAudio() {
   if (state.audioStarting) return;
   state.audioStarting = true;
   try {
+    primeAudioFromGesture();
     await ensureAudio();
-    if (audio.context?.state !== "running") await audio.context.resume();
     state.audioOn = !state.audioOn;
     if (state.audioOn) {
       rebuildAudioGraph();
+      playAudioConfirmation();
       await startSource();
-      announce("Audio started. Output is a browser simulation.");
+      const status=$("#audio-device-status"); if(status)status.textContent="Audio ON · tap again to stop";
+      announce("Audio started. If you heard the short tone, the phone audio engine is unlocked.");
     } else {
       stopSource();
       await audio.context.suspend();
+      const status=$("#audio-device-status"); if(status)status.textContent="Audio stopped";
       announce("Audio stopped.");
     }
     syncAudioButtons();
@@ -2628,6 +2668,10 @@ function bindEvents() {
   $("#inspector-content").addEventListener("change", (event) => {
     if (event.target.matches("select[data-param]")) updateSelectedParam(event.target.dataset.param, event.target.value);
   });
+  $("#audio-toggle").addEventListener("pointerdown", primeAudioFromGesture);
+  $("#hardware-audio-toggle").addEventListener("pointerdown", primeAudioFromGesture);
+  $("#sequencer-start").addEventListener("pointerdown", primeAudioFromGesture);
+  $("#synth-keyboard").addEventListener("pointerdown", primeAudioFromGesture, {capture:true});
   $("#audio-toggle").addEventListener("click", toggleAudio);
   $("#hardware-audio-toggle").addEventListener("click", toggleAudio);
   $("#hardware-source-select").addEventListener("change", async (event) => {
