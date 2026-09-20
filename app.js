@@ -538,13 +538,41 @@ function sequenceIntervalMs() {
   return (60000 / state.midiBpm) / state.stepDivision;
 }
 
+function tempoMotionForBpm(bpm) {
+  if (bpm < 55) return { mode: "worm", name: "Slow crawl", range: "30–54 BPM" };
+  if (bpm < 100) return { mode: "ballad", name: "Ballad couple", range: "55–99 BPM" };
+  if (bpm < 150) return { mode: "party", name: "Dance party", range: "100–149 BPM" };
+  if (bpm < 190) return { mode: "horse", name: "Running horse", range: "150–189 BPM" };
+  return { mode: "eagle", name: "Fast flight", range: "190–300 BPM" };
+}
+
 function syncTempoCoach(bpm = state.midiBpm) {
   const safeBpm = clamp(Number(bpm) || state.midiBpm, 30, 300);
   const beatMs = 60000 / safeBpm;
   const station = $("#midi-tempo-station");
-  if (station) station.style.setProperty("--tempo-beat-ms", `${beatMs}ms`);
+  const motion = tempoMotionForBpm(safeBpm);
+  if (station) {
+    station.style.setProperty("--tempo-beat-ms", `${beatMs}ms`);
+    station.style.setProperty("--tempo-turn", `${-135 + ((safeBpm - 30) / 270) * 270}deg`);
+    station.classList.remove("tempo-mode-worm","tempo-mode-ballad","tempo-mode-party","tempo-mode-horse","tempo-mode-eagle");
+    station.classList.add(`tempo-mode-${motion.mode}`);
+  }
+  const knob = $("#tempo-knob");
+  if (knob) knob.setAttribute("aria-valuenow", String(Math.round(safeBpm)));
   const readout = $("#tempo-motion-label");
   if (readout) readout.textContent = `${Math.round(beatMs)} ms / beat`;
+  const name = $("#tempo-motion-name");
+  if (name) name.textContent = motion.name;
+  const range = $("#tempo-motion-range");
+  if (range) range.textContent = motion.range;
+}
+
+function setMidiTempo(value, restart = false) {
+  state.midiBpm = clamp(Math.round(Number(value) || 120), 30, 300);
+  const input = $("#midi-bpm");
+  if (input) input.value = state.midiBpm;
+  syncTempoCoach(state.midiBpm);
+  if (restart && state.sequencerRunning) startSource();
 }
 
 function randomizePattern(glitch = false) {
@@ -2484,8 +2512,41 @@ function bindEvents() {
   $("#synth-waveform").addEventListener("change", async (event) => { state.synthWaveform = event.target.value; if (state.sequencerRunning) await startSource(); });
   $("#voice-parameter-knobs").addEventListener("input",(event)=>{const control=event.target.closest("[data-voice-param]");if(control)updateVoiceParameter(control.dataset.voiceParam,control.value);});
   $("#arp-mode").addEventListener("change", (event) => { state.arpMode = event.target.value; });
-  $("#midi-bpm").addEventListener("input", (event) => syncTempoCoach(event.target.value));
-  $("#midi-bpm").addEventListener("change", async (event) => { state.midiBpm = clamp(Number(event.target.value)||120,30,300); event.target.value=state.midiBpm; syncTempoCoach(); if(state.sequencerRunning) await startSource(); });
+  $("#midi-bpm").addEventListener("input", (event) => { state.midiBpm = clamp(Number(event.target.value)||120,30,300); syncTempoCoach(state.midiBpm); });
+  $("#midi-bpm").addEventListener("change", async (event) => { setMidiTempo(event.target.value); if(state.sequencerRunning) await startSource(); });
+  const tempoKnob = $("#tempo-knob");
+  let tempoDrag = null;
+  tempoKnob?.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    tempoDrag = { y: event.clientY, bpm: state.midiBpm };
+    tempoKnob.setPointerCapture?.(event.pointerId);
+  });
+  tempoKnob?.addEventListener("pointermove", (event) => {
+    if (!tempoDrag) return;
+    setMidiTempo(tempoDrag.bpm + (tempoDrag.y - event.clientY) * .75);
+  });
+  const finishTempoDrag = async (event) => {
+    if (!tempoDrag) return;
+    tempoDrag = null;
+    tempoKnob.releasePointerCapture?.(event.pointerId);
+    if (state.sequencerRunning) await startSource();
+  };
+  tempoKnob?.addEventListener("pointerup", finishTempoDrag);
+  tempoKnob?.addEventListener("pointercancel", finishTempoDrag);
+  tempoKnob?.addEventListener("wheel", async (event) => {
+    event.preventDefault();
+    setMidiTempo(state.midiBpm + (event.deltaY < 0 ? 1 : -1));
+    if (state.sequencerRunning) await startSource();
+  }, { passive: false });
+  tempoKnob?.addEventListener("keydown", async (event) => {
+    const amount = event.shiftKey ? 5 : 1;
+    if (!["ArrowUp","ArrowRight","ArrowDown","ArrowLeft","Home","End"].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === "Home") setMidiTempo(30);
+    else if (event.key === "End") setMidiTempo(300);
+    else setMidiTempo(state.midiBpm + (["ArrowUp","ArrowRight"].includes(event.key) ? amount : -amount));
+    if (state.sequencerRunning) await startSource();
+  });
   $("#step-division").addEventListener("change", async (event) => { state.stepDivision=Number(event.target.value); if(state.sequencerRunning) await startSource(); });
   $("#pattern-duration").addEventListener("change", (event) => { state.patternDuration=clamp(Number(event.target.value)||0,0,5); event.target.value=state.patternDuration; });
   $("#start-delay").addEventListener("change", (event) => { state.startDelay=event.target.value; });
