@@ -199,6 +199,17 @@ const MODULES = {
   }
 };
 
+// Delay modulation and all-pass phase models are explicitly behavioral studies.
+for (const [type,name,description] of [
+ ['chorus','Chorus','A slowly modulated short delay mixed with the dry signal creates moving detuning.'],
+ ['flanger','Flanger','A sub-10 ms modulated delay creates moving comb-filter notches.'],
+ ['phaser','Phaser','Four swept all-pass stages mixed with dry audio create moving phase-cancellation notches.']
+]) MODULES[type]={name,shortName:name.toUpperCase(),description,color:'#b9b2d2',params:[
+ {key:'rate',label:'Modulation rate',unit:'Hz',min:.05,max:8,step:.05,value:.7,role:'LFO speed; independent of note pitch.'},
+ {key:'depth',label:type==='phaser'?'Sweep depth':'Delay depth',unit:type==='phaser'?'%':'ms',min:0,max:type==='phaser'?95:type==='chorus'?8:3,step:.1,value:type==='phaser'?55:type==='chorus'?3:1,role:'Changes the amount of modulation.'},
+ {key:'mix',label:'Wet mix',unit:'%',min:0,max:100,step:1,value:45,role:'Mixes phase-shifted or delayed audio with the dry signal.'}
+ ],bom:[['Behavioral study only: '+name,1,0,'Requires a separately validated physical '+name+' design']]};
+
 const EFFECT_CIRCUITS = [
   {id:"effect-oscillator",moduleType:"oscillator",maker:"Studio circuit",name:"NE555 oscillator",status:"Calculated astable teaching circuit",blocks:["DC supply","R1 + pitch pot","Timing capacitor","NE555 thresholds","Square output","Level mix"]},
   {id:"effect-fuzz",moduleType:"fuzz",maker:"Studio circuit",name:"Transistor / diode fuzz",status:"Interactive behavioral circuit study",blocks:["Input coupling","Gain stage","Clipping diodes","RC tone","Level"]},
@@ -211,6 +222,8 @@ const EFFECT_CIRCUITS = [
   {id:"effect-korgfilter",moduleType:"korgfilter",maker:"Studio circuit",name:"Korg-style resonant VCF",status:"Behavioral filter study · official source linked separately",blocks:["Input","Drive","Two-pole VCF","Resonance","Wet / dry"]},
   {id:"effect-brute",moduleType:"brute",maker:"Studio circuit",name:"Steiner-style multimode filter",status:"Behavioral filter study · official architecture reference",blocks:["Input","Mode selector","Multimode VCF","Feedback drive","Output"]}
 ];
+
+EFFECT_CIRCUITS.push(...['chorus','flanger','phaser'].map(type=>({id:'effect-'+type,moduleType:type,maker:'Studio circuit',name:MODULES[type].name,status:'Behavioral study · physical design required',blocks:type==='phaser'?['Input buffer','Four all-pass stages','LFO sweep','Dry / wet sum']:['Input buffer','Short delay','LFO modulation','Dry / wet sum']})));
 
 const BASE_BOM = [
   ["Solderless breadboard, full size", 1, 8.50, "full size solderless breadboard"],
@@ -245,6 +258,15 @@ const state = {
   voiceParams: {cutoff:9000,resonance:1,attack:2,release:12,fmAmount:0,subMix:0},
   arpMode: "pattern",
   arpOctave: 0,
+  stepOctaves: Array(32).fill(0),
+  sequenceTarget: "chain",
+  gate: .72,
+  swing: 0,
+  repeatLength: 4,
+  repeatStart: 0,
+  repeatCursor: 0,
+  guitarRoot: null,
+  heldNote: null,
   globalOctave: 0,
   kaossX: 0.5,
   kaossY: 0.5,
@@ -336,7 +358,7 @@ const ENGINEERING_HELP = {
     { title: "TL072 sound physics", body: "The feedback-to-input resistance ratio sets ideal inverting gain. Antiparallel diodes in the feedback path reduce gain when their forward threshold is reached, rounding or clipping the waveform.", formula: "|A| ≈ RF / RIN" }
   ],
   dip14: [
-    { title: "CD40106 Schmitt oscillator", body: "A Schmitt inverter has two switching thresholds. The resistor feeds the output back to the input while the capacitor charges and discharges between those thresholds.", formula: "f ≈ 1 / (2.2RC), approximate" },
+    { title: "CD40106 Schmitt oscillator", body: "A Schmitt inverter has two switching thresholds. The resistor feeds the output back to the input while the capacitor charges and discharges between those thresholds.", formula: "f ≈ 1 / (1.386RC), approximate" },
     { title: "Unused CMOS inputs", body: "Unused CD40106 inputs must be tied to a defined logic level. Floating CMOS inputs can oscillate, draw extra current, and inject noise.", formula: "unused input → GND or VDD; output left open" }
   ],
   resistor: [
@@ -389,7 +411,7 @@ function showHelp(topic = "mixing", reset = true) {
   renderEngineeringHelp();
 }
 
-const SEQUENCER_ROWS = [72, 69, 67, 64, 60, 57, 55, 52];
+const SEQUENCER_ROWS = Array.from({length:25},(_,i)=>72-i);
 const SYNTH_PROFILES = {
   "osc-555": { wave:"square", cutoff:9000, resonance:1, attack:2, release:12, fmAmount:0, subMix:0, label:"555 pulse oscillator behavioral voice" },
   werkstatt: { wave:"sawtooth", cutoff:1300, resonance:7, attack:9, release:25, sub:true, subMix:28, fmAmount:0, label:"Moog Werkstatt-style behavioral voice" },
@@ -412,7 +434,7 @@ const VOICE_PARAMETERS = [
 ];
 
 const PRIMARY_PARAMETERS = {
-  oscillator:"r2", fuzz:"rf", overdrive:"drive", distortion:"drive", octave:"blend",
+  chorus:"depth",flanger:"depth",phaser:"depth",oscillator:"r2", fuzz:"rf", overdrive:"drive", distortion:"drive", octave:"blend",
   delay:"clockR2", glitch:"clockR", ladder:"cutoff", korgfilter:"cutoff", brute:"cutoff"
 };
 
@@ -492,10 +514,13 @@ function updateVoiceParameter(key,value) {
 
 function renderSequencer() {
   const start = state.sequencerBar * 16;
-  $("#arp-grid").innerHTML = `<div class="arp-step-numbers"><span></span>${Array.from({length:16},(_,index)=>`<b>${index + 1}</b>`).join("")}</div>${SEQUENCER_ROWS.map((note) => `<div class="arp-note-row" role="row"><span>${midiToName(note)}</span>${Array.from({length:16},(_,index)=>{const patternIndex=start+index;const active=state.sequencePattern[patternIndex]===note;return `<button type="button" role="gridcell" data-pattern-step="${patternIndex}" data-pattern-note="${note}" aria-pressed="${active}" aria-label="${midiToName(note)}, bar ${state.sequencerBar+1}, step ${index+1}"><i></i></button>`;}).join("")}</div>`).join("")}`;
+  const visibleNotes=[...new Set([...SEQUENCER_ROWS,...state.sequencePattern.filter(n=>n!=null)])].sort((a,b)=>b-a);
+  $("#arp-grid").innerHTML = `<div class="arp-step-numbers"><span></span>${Array.from({length:16},(_,index)=>`<b>${index + 1}</b>`).join("")}</div>${visibleNotes.map((note) => `<div class="arp-note-row" role="row"><span>${midiToName(note)}</span>${Array.from({length:16},(_,index)=>{const patternIndex=start+index;const active=state.sequencePattern[patternIndex]===note;return `<button type="button" role="gridcell" data-pattern-step="${patternIndex}" data-pattern-note="${note}" aria-pressed="${active}" aria-label="${midiToName(note)}, bar ${state.sequencerBar+1}, step ${index+1}"><i></i></button>`;}).join("")}</div>`).join("")}`;
   $$('[data-pattern-bar]').forEach((button)=>button.setAttribute("aria-selected",String(Number(button.dataset.patternBar)===state.sequencerBar)));
   $("#midi-pattern").value = patternText(0);
   $("#midi-pattern-bar-2").value = patternText(1);
+  const octaves=$('#step-octaves');
+  if(octaves)octaves.innerHTML=Array.from({length:16},(_,i)=>{const n=start+i;return `<label>${i+1}<select data-step-octave="${n}" aria-label="Octave for step ${n+1}">${[-2,-1,0,1,2].map(v=>`<option value="${v}"${v===state.stepOctaves[n]?' selected':''}>${v>0?'+':''}${v}</option>`).join('')}</select></label>`;}).join('');
   updateSequencerPlayhead();
 }
 
@@ -508,6 +533,9 @@ function updateSequencerPlayhead() {
 }
 
 function applyMidiText() {
+  const tokens=[$("#midi-pattern").value,$("#midi-pattern-bar-2").value].flatMap(v=>v.split(/[\s,]+/).filter(Boolean));
+  const invalid=tokens.find(t=>t!=="-"&&!/^rest$/i.test(t)&&noteNameToMidi(t)==null);
+  if(invalid){announce(`Unknown note: ${invalid}. Use C3, F#3, Bb3 or a dash.`);return;}
   const parseBar = (selector) => {
     const notes = $(selector).value.split(/[\s,]+/).filter(Boolean).slice(0,16).map((token) => token === "-" || /^rest$/i.test(token) ? null : noteNameToMidi(token));
     while (notes.length < 16) notes.push(null);
@@ -529,16 +557,37 @@ function sequenceNoteForStep(step) {
     note = state.sequencePattern[step];
     if (state.arpMode === "glitch" && note != null && Math.random() > .62) note += Math.random() > .5 ? 12 : -12;
   }
-  return note == null ? null : clamp(note + (state.arpOctave + state.globalOctave) * 12, 0, 127);
+  return note == null ? null : clamp(note + (state.arpOctave + state.globalOctave + state.stepOctaves[step]) * 12 + ((state.sequenceTarget==="guitar-synth" && state.guitarRoot!=null)?state.guitarRoot-48:0), 0, 127);
 }
 
 function triggerSequenceStep() {
-  if (!state.sequencerRunning || !audio.sequencerVoice) return;
-  if (state.performance.freeze) return;
-  const note = sequenceNoteForStep(state.sequencerStep);
-  gateSynthNote(state.performance.mute ? null : note, sequenceIntervalMs() / 1000 * .72, "sequencer");
+  if (!state.sequencerRunning || (!audio.sequencerVoice && !audio.externalGate)) return;
+  const step=state.performance.repeat ? (state.repeatStart+state.repeatCursor)%32 : state.sequencerStep;
+  const note=state.performance.freeze?state.heldNote:sequenceNoteForStep(step);
+  if(!state.performance.freeze)state.heldNote=note;
+  const interval=sequenceIntervalMs()/1000*(step%2?1-state.swing:1+state.swing);
+  gateSynthNote(state.performance.mute?null:note,state.performance.freeze?null:interval*state.gate,'sequencer');
+  state.sequencerStep=step;
   updateSequencerPlayhead();
-  if (!state.performance.repeat) state.sequencerStep = (state.sequencerStep + 1) % 32;
+  audio.clockTicks=(audio.clockTicks||0)+1;
+  updateTempoDancers(audio.clockTicks-1);
+  if(!state.performance.freeze){
+    if(state.performance.repeat)state.repeatCursor=(state.repeatCursor+1)%state.repeatLength;
+    else state.sequencerStep=(step+1)%32;
+  }
+}
+function scheduleSequence() {
+  if(!state.sequencerRunning)return;
+  triggerSequenceStep();
+  const delay=sequenceIntervalMs()*(state.sequencerStep%2?1+state.swing:1-state.swing);
+  audio.sequenceTimer=window.setTimeout(scheduleSequence,delay);
+}
+function updateTempoDancers(step) {
+  const station=$("#midi-tempo-station");if(!station)return;
+  const active=state.sequencerRunning&&state.audioOn;
+  station.classList.toggle('is-running',active);
+  station.dataset.pose=String(Math.floor(step/state.stepDivision)%4);
+  $$('#beat-lights i').forEach((el,i)=>el.classList.toggle('active',active&&i===Math.floor(step/state.stepDivision)%4));
 }
 
 function sequenceIntervalMs() {
@@ -591,8 +640,9 @@ function randomizePattern(glitch = false) {
 
 async function startSequencerTransport() {
   primeAudioFromGesture();
-  state.source = "sequencer";
-  $("#source-select").value = "sequencer";
+  audio.clockTicks=0;
+  state.source = state.sequenceTarget.startsWith("guitar")?"microphone":"sequencer";
+  $("#source-select").value = state.source;
   await ensureAudio();
   stopSource();
   state.audioOn = true;
@@ -679,6 +729,7 @@ function formatValue(param, value) {
 
 function calculateModule(instance) {
   const p = instance.params;
+  if(['chorus','flanger','phaser'].includes(instance.type))return {title:MODULES[instance.type].name+' modulation',formula:instance.type==='phaser'?'All-pass phase sweep + dry signal':'y(t) = dry·x(t) + wet·x(t − delay(t))',substitution:`LFO ${p.rate} Hz · depth ${p.depth} · mix ${p.mix}%`,result:`${p.rate} modulation cycles / second`,why:MODULES[instance.type].description};
   if (instance.type === "oscillator") {
     const frequency = 1 / (0.693 * ((p.r1 + 2 * p.r2) * 1000) * (p.c * 1e-9));
     const second = 1 / (0.693 * ((p.r1 + 2 * p.r2b) * 1000) * (p.c * 1e-9));
@@ -747,11 +798,11 @@ function calculateModule(instance) {
     };
   }
   if (instance.type === "glitch") {
-    const chopRate = 1 / (2.2 * p.clockR * 1000 * p.clockC * 1e-6);
+    const chopRate = 1 / (1.386294 * p.clockR * 1000 * p.clockC * 1e-6);
     return {
       title: "RC chopping rate",
-      formula: "f ≈ 1 ÷ (2.2RC)",
-      substitution: `1 ÷ (2.2 × ${p.clockR} kΩ × ${p.clockC} µF)`,
+      formula: "f ≈ 1 ÷ (1.386RC)",
+      substitution: `1 ÷ (1.386 × ${p.clockR} kΩ × ${p.clockC} µF)`,
       result: `${chopRate.toFixed(1)} Hz calculated · ${clamp(chopRate, .5, 80).toFixed(1)} Hz browser model`,
       why: "The RC network sets a repeating on/off gate. This intentionally breaks continuity; reducing amplitude steps adds quantization texture.",
       chopRate
@@ -796,7 +847,7 @@ function renderMacroPanel() {
   $("#macro-knobs").innerHTML = state.macros.map((macro,index)=>{
     const active = state.activeMacro===index;
     const angle = -135 + Number(macro.value) / 127 * 270;
-    return `<article class="macro-control${active?" is-armed":""}" data-macro-card="${index}"><button type="button" class="macro-select" data-macro-select="${index}" aria-pressed="${active}"><span>M${index+1}</span><small>${macro.midiCc==null?"CC --":`CC ${macro.midiCc}`}</small></button><label for="macro-${index}"><span class="macro-dial" style="--macro-angle:${angle}deg"><i></i></span><input id="macro-${index}" class="macro-range" type="range" min="0" max="127" value="${macro.value}" data-macro-value="${index}" aria-label="Macro ${index+1}, ${macroAssignmentLabel(macro)}"><strong>${macroAssignmentLabel(macro)}</strong></label></article>`;
+    return `<article class="macro-control${active?" is-armed":""}" data-macro-card="${index}"><button type="button" class="macro-select" data-macro-select="${index}" aria-pressed="${active}"><span>M${index+1}</span><small>${macro.midiCc==null?"CC --":`CC ${macro.midiCc}`}</small></button><label for="macro-${index}"><span class="macro-dial" style="--macro-angle:${angle}deg"><i></i></span><input id="macro-${index}" class="macro-range" type="range" min="0" max="127" value="${macro.value}" data-macro-value="${index}" aria-label="Macro ${index+1}, ${macroAssignmentLabel(macro)}"><strong>${macroAssignmentLabel(macro)}</strong></label><button type="button" class="macro-clear" data-clear-macro="${index}" aria-label="Clear macro ${index+1}">Clear</button></article>`;
   }).join("");
 }
 
@@ -859,6 +910,9 @@ function assignMacroToVoice(paramKey) {
 
 function handleMidiMessage(event) {
   const [status,controller,value]=event.data;
+  const kind=status&0xf0;
+  if(kind===0x90&&value>0){startKeyboardNote(controller);return;}
+  if(kind===0x80||(kind===0x90&&value===0)){stopKeyboardNote(controller);return;}
   if ((status&0xf0)!==0xb0) return;
   if (state.midiLearnMode && state.activeMacro!=null) {
     state.macros[state.activeMacro].midiCc=controller;
@@ -979,7 +1033,11 @@ function applyKaossPosition(x,y,render=true) {
   const targetOut=$("#kaoss-target"); if(targetOut)targetOut.textContent=target?`Selected module: ${MODULES[target.instance.type].name} #${target.instance.id}`:"Selected module: none";
 }
 
-function renderKaossPad() { applyKaossPosition(state.kaossX,state.kaossY,false); }
+function renderKaossPad() {
+  const pad=$('#kaoss-pad');if(pad){pad.style.setProperty('--kaoss-x',state.kaossX*100+'%');pad.style.setProperty('--kaoss-y',(1-state.kaossY)*100+'%');}
+  const target=selectedModulePrimaryParameter();
+  $('#kaoss-target').textContent=target?`Selected module: ${MODULES[target.instance.type].name} #${target.instance.id}`:'Select a module for Y control';
+}
 
 function setArpOctave(value) {
   state.arpOctave=clamp(Math.round(Number(value)||0),-3,3);
@@ -989,7 +1047,7 @@ function setArpOctave(value) {
   if(windowEl) windowEl.style.setProperty("--arp-octave-position",((3-state.arpOctave)/6*100)+"%");
 }
 function setGlobalOctave(value) {
-  state.globalOctave=clamp(Math.round(Number(value)||0),-2,2);
+  state.globalOctave=clamp(Math.round(Number(value)||0),-3,3);
   $("#global-octave").value=state.globalOctave; $("#global-octave-value").textContent=(state.globalOctave>0?"+":"")+state.globalOctave+" oct";
 }
 
@@ -1108,7 +1166,11 @@ function playAudioConfirmation() {
 
 function stopSource() {
   window.clearInterval(audio.riffTimer);
-  window.clearInterval(audio.sequenceTimer);
+  window.clearTimeout(audio.sequenceTimer);
+  window.cancelAnimationFrame(audio.pitchFrame);
+  audio.externalGate=null;
+  audio.pitchAnalyser=null;
+  state.guitarRoot=null;
   window.clearTimeout(audio.sequenceStopTimer);
   window.clearTimeout(audio.sequenceStartTimer);
   audio.riffTimer = null;
@@ -1116,7 +1178,9 @@ function stopSource() {
   audio.sequenceStopTimer = null;
   audio.sequenceStartTimer = null;
   audio.sequencerVoice = null;
+  if(typeof combination!=="undefined")combination.node=null;
   state.sequencerRunning = false;
+  updateTempoDancers(0);
   state.keyboardNote = null;
   $$('[data-keyboard-note]').forEach((key) => key.classList.remove("is-playing"));
   audio.sourceNodes.forEach((node) => {
@@ -1141,11 +1205,26 @@ function createSynthVoice() {
   const filter = ctx.createBiquadFilter();
   carrier.type = state.synthWaveform || profile.wave;
   carrier.frequency.value = 130.81;
-  envelope.gain.value = 0.0001;
+  envelope.gain.value = 0;
   filter.type = "lowpass";
   filter.frequency.value = voiceParams.cutoff;
   filter.Q.value = voiceParams.resonance;
-  carrier.connect(envelope);
+  const targets=state.sequenceTarget==='chain'?state.modules.filter(m=>m.type==='oscillator'&&!m.bypassed):state.modules.filter(m=>String(m.id)===state.sequenceTarget&&!m.bypassed);
+  const voices=[];
+  if(targets.length){
+    targets.forEach((m,index)=>{
+      const calc=calculateModule(m);
+      for(let v=0;v<(m.params.voices==='dual'?2:1);v++){
+        const osc=index===0&&v===0?carrier:ctx.createOscillator();
+        const level=ctx.createGain();level.gain.value=m.params.mix/100;
+        osc.setPeriodicWave(timerWave(ctx,(m.params.r1+(v?m.params.r2b:m.params.r2))/(m.params.r1+2*(v?m.params.r2b:m.params.r2))));osc.connect(level);level.connect(envelope);
+        voices.push({osc,moduleId:m.id,second:!!v});
+        if(osc!==carrier){osc.start();audio.sourceNodes.push(osc);}
+        audio.sourceNodes.push(level);
+      }
+    });
+  }else{carrier.connect(envelope);}
+
   let sub = null;
   let subGain = null;
   if (profile.sub) {
@@ -1178,41 +1257,51 @@ function createSynthVoice() {
   }
   envelope.connect(filter); filter.connect(audio.sourceBus); carrier.start();
   audio.sourceNodes.push(carrier, envelope, filter);
-  audio.sequencerVoice = { carrier, envelope, filter, sub, subGain, modulator, modGain };
+  audio.sequencerVoice = { carrier, envelope, filter, sub, subGain, modulator, modGain, voices };
   return audio.sequencerVoice;
 }
 
 function gateSynthNote(note, gateSeconds = null, origin = "keyboard") {
-  if (!audio.sequencerVoice || !audio.context) return;
-  const { carrier, modulator, modGain, sub, envelope } = audio.sequencerVoice;
-  const profile=SYNTH_PROFILES[state.synthProfile];
-  const attack=Math.max(.001,state.voiceParams.attack/1000);
-  const release=Math.max(.005,state.voiceParams.release/1000);
-  const effectiveAttack=gateSeconds==null?attack:Math.min(attack,gateSeconds*.24);
-  const time = audio.context.currentTime;
-  envelope.gain.cancelScheduledValues(time);
-  envelope.gain.setValueAtTime(Math.max(0.0001, envelope.gain.value), time);
-  if (note == null || state.performance.mute) {
-    envelope.gain.setTargetAtTime(0.0001, time, Math.max(.004,release/4));
-    state.lastMidiMessage = `MIDI: Note Off · ${origin} · channel 1`;
-    return;
+  if(!audio.context)return;
+  const voice=audio.sequencerVoice;
+  const envelope=audio.externalGate || voice?.envelope;
+  if(!envelope)return;
+  const time=audio.context.currentTime;
+  const param=envelope.gain;
+  if(param.cancelAndHoldAtTime)param.cancelAndHoldAtTime(time);else{param.cancelScheduledValues(time);param.setValueAtTime(param.value,time);}
+  if(note==null || state.performance.mute){
+    param.linearRampToValueAtTime(0,time+.004);
+    state.lastMidiMessage=`Note off · ${origin}`;return;
   }
-  const frequency = midiFrequency(note);
-  carrier.frequency.setTargetAtTime(frequency, time, .006);
-  if (sub) sub.frequency.setTargetAtTime(frequency / 2, time, .006);
-  if (modulator) {
-    modulator.frequency.setTargetAtTime(frequency * (profile.fmRatio || 2), time, .006);
-    modGain.gain.setTargetAtTime(frequency * state.voiceParams.fmAmount / 100, time, .01);
+  if(voice){
+    const frequency=midiFrequency(note);
+    voice.carrier.frequency.setTargetAtTime(frequency,time,.003);
+    voice.voices.forEach(({osc,moduleId,second})=>{
+      const m=state.modules.find(x=>x.id===moduleId);if(!m)return;
+      const calc=calculateModule(m);const base=second?calc.secondFrequency:calc.frequency;
+      osc.frequency.setTargetAtTime(clamp(base*Math.pow(2,(note-48)/12),10,16000),time,.003);
+    });
+    if(voice.sub)voice.sub.frequency.setTargetAtTime(frequency/2,time,.003);
+    if(voice.modulator){voice.modulator.frequency.setTargetAtTime(frequency*(SYNTH_PROFILES[state.synthProfile].fmRatio||2),time,.003);voice.modGain.gain.setTargetAtTime(frequency*state.voiceParams.fmAmount/100,time,.003);}
   }
-  envelope.gain.linearRampToValueAtTime(.18, time + effectiveAttack);
-  envelope.gain.exponentialRampToValueAtTime(.11, time + effectiveAttack + .035);
-  if (gateSeconds != null) {
-    const releaseDuration=Math.min(release,Math.max(.01,gateSeconds*.55));
-    const releaseStart = time + Math.max(effectiveAttack+.04, gateSeconds-releaseDuration);
-    envelope.gain.setValueAtTime(.11, releaseStart);
-    envelope.gain.exponentialRampToValueAtTime(.0001, time + Math.max(effectiveAttack+.055, gateSeconds));
+  const peak=audio.externalGate?1:.18, sustain=audio.externalGate?1:.11;
+  const timing=CircuitCore.envelopeTimes(gateSeconds==null?10:gateSeconds/state.gate,state.voiceParams.attack,state.voiceParams.release,state.gate);
+  param.linearRampToValueAtTime(peak,time+timing.attack);
+  if(gateSeconds==null){param.linearRampToValueAtTime(sustain,time+timing.attack+.025);}
+  else{
+    param.linearRampToValueAtTime(sustain,time+timing.decay);
+    param.setValueAtTime(sustain,time+timing.releaseStart);
+    param.linearRampToValueAtTime(0,time+timing.end);
   }
-  state.lastMidiMessage = `MIDI: Note On ${midiToName(note)} · note ${note} · velocity 100 · ${origin} · channel 1`;
+  state.lastMidiMessage=`Note on ${midiToName(note)} · ${origin}${state.sequenceTarget==='guitar-gate'?' · input gate':''}`;
+}
+function trackGuitarPitch(){
+  if(!audio.pitchAnalyser)return;
+  const data=new Float32Array(audio.pitchAnalyser.fftSize);audio.pitchAnalyser.getFloatTimeDomainData(data);
+  const f=CircuitCore.detectPitch(data,audio.context.sampleRate);
+  state.guitarRoot=f?Math.round(CircuitCore.frequencyToMidi(f)):null;
+  const out=$('#guitar-status');if(out)out.textContent=f?`${f.toFixed(1)} Hz · ${midiToName(state.guitarRoot)}`:'Waiting for a clear single guitar note';
+  audio.pitchFrame=requestAnimationFrame(trackGuitarPitch);
 }
 
 async function startKeyboardNote(note) {
@@ -1228,7 +1317,8 @@ async function startKeyboardNote(note) {
     createSynthVoice();
   }
   state.keyboardNote = note;
-  gateSynthNote(note, null, "keyboard");
+  state.heldNote=clamp(note+state.globalOctave*12,0,127);
+  gateSynthNote(clamp(note+state.globalOctave*12,0,127), null, "keyboard");
   $$('[data-keyboard-note]').forEach((key) => key.classList.toggle("is-playing", Number(key.dataset.keyboardNote) === note));
   $("#midi-message").textContent = state.lastMidiMessage;
   syncAudioButtons();
@@ -1250,14 +1340,21 @@ async function startSource() {
     try {
       audio.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
       const mic = ctx.createMediaStreamSource(audio.stream);
-      mic.connect(audio.sourceBus);
+      if(state.sequenceTarget.startsWith('guitar')){
+        audio.pitchAnalyser=ctx.createAnalyser();audio.pitchAnalyser.fftSize=2048;
+        mic.connect(audio.pitchAnalyser);audio.sourceNodes.push(audio.pitchAnalyser);
+        if(state.sequenceTarget==='guitar-gate'){
+          audio.externalGate=ctx.createGain();audio.externalGate.gain.value=0;
+          mic.connect(audio.externalGate);audio.externalGate.connect(audio.sourceBus);audio.sourceNodes.push(audio.externalGate);
+        }else createSynthVoice();
+        state.sequencerRunning=true;scheduleSequence();trackGuitarPitch();
+        if(state.patternDuration>0)audio.sequenceStopTimer=setTimeout(stopSequencerTransport,state.patternDuration*60000);
+      }else mic.connect(audio.sourceBus);
       audio.sourceNodes.push(mic);
       announce("Microphone input active. Use headphones to prevent feedback.");
     } catch (error) {
-      state.source = "tone";
-      $("#source-select").value = "tone";
-      announce("Microphone permission was unavailable. Test oscillator selected.");
-      startSource();
+      stopSource();state.audioOn=false;syncAudioButtons();
+      announce("Microphone access was unavailable. Audio stopped; allow microphone access to use guitar input.");
     }
     return;
   }
@@ -1278,8 +1375,7 @@ async function startSource() {
     const profile = SYNTH_PROFILES[state.synthProfile];
     createSynthVoice();
     state.sequencerRunning = true;
-    triggerSequenceStep();
-    audio.sequenceTimer = window.setInterval(triggerSequenceStep, sequenceIntervalMs());
+    scheduleSequence();
     if (state.patternDuration > 0) audio.sequenceStopTimer = window.setTimeout(stopSequencerTransport, state.patternDuration * 60000);
     announce(`${profile.label} running at ${state.midiBpm} BPM.`);
     return;
@@ -1292,7 +1388,7 @@ async function startSource() {
   if (state.source === "tone") {
     const osc = ctx.createOscillator();
     osc.type = "sawtooth";
-    osc.frequency.value = 110;
+    osc.frequency.value = 110*Math.pow(2,state.globalOctave);
     osc.connect(output);
     osc.start();
     audio.sourceNodes.push(osc);
@@ -1347,6 +1443,11 @@ function diodeThreshold(material) {
   return material === "germanium" ? 0.3 : material === "schottky" ? 0.25 : material === "led" ? 1.8 : 0.7;
 }
 
+function timerWave(ctx,duty){
+ const real=new Float32Array(65),imag=new Float32Array(65);
+ for(let n=1;n<65;n++){real[n]=2*Math.sin(2*Math.PI*n*duty)/(Math.PI*n);imag[n]=2*(1-Math.cos(2*Math.PI*n*duty))/(Math.PI*n);}
+ return ctx.createPeriodicWave(real,imag);
+}
 function createModuleProcessor(instance) {
   const ctx = audio.context;
   const input = ctx.createGain();
@@ -1355,20 +1456,34 @@ function createModuleProcessor(instance) {
   const p = instance.params;
   const supplyScale = clamp(Number(p.supply || 9) / 9, 0.55, 1.34);
 
+  if(['chorus','flanger','phaser'].includes(instance.type)){
+    const dry=ctx.createGain(),wet=ctx.createGain(),lfo=ctx.createOscillator(),depth=ctx.createGain();
+    dry.gain.value=1-p.mix/100;wet.gain.value=p.mix/100;
+    input.connect(dry);dry.connect(output);lfo.frequency.value=p.rate;lfo.type='sine';
+    if(instance.type==='phaser'){
+      let previous=input;
+      for(let i=0;i<4;i++){const filter=ctx.createBiquadFilter();filter.type='allpass';filter.frequency.value=700+i*180;filter.Q.value=.6;previous.connect(filter);depth.connect(filter.frequency);previous=filter;nodes.push(filter);}
+      depth.gain.value=p.depth/100*600;previous.connect(wet);
+    }else{
+      const delay=ctx.createDelay(.08);delay.delayTime.value=instance.type==='chorus'?.018:.004;depth.gain.value=p.depth/1000;input.connect(delay);depth.connect(delay.delayTime);delay.connect(wet);nodes.push(delay);
+    }
+    wet.connect(output);lfo.connect(depth);lfo.start();nodes.push(dry,wet,lfo,depth);
+    return {input,output,nodes};
+  }
   if (instance.type === "oscillator") {
-    if (!p.hardwareOnly || state.source === "sequencer") input.connect(output);
-    if (state.source === "sequencer") return { input, output, nodes };
+    if (!p.hardwareOnly || state.source === "sequencer" || (state.source==="microphone" && state.sequenceTarget.startsWith("guitar"))) input.connect(output);
+    if ((state.source === "sequencer" || (state.source==="microphone" && state.sequenceTarget.startsWith("guitar")))) return { input, output, nodes };
     const result = calculateModule(instance);
-    const frequency = clamp(result.frequency, 20, 12000);
+    const frequency = clamp(result.frequency*Math.pow(2,state.globalOctave), 20, 12000);
     const toneGain = ctx.createGain();
     toneGain.gain.value = p.mix / 100 * 0.14 * supplyScale;
     toneGain.connect(output);
     const osc1 = ctx.createOscillator();
-    osc1.type = "square"; osc1.frequency.value = frequency; osc1.connect(toneGain); osc1.start();
+    osc1.setPeriodicWave(timerWave(ctx,(p.r1+p.r2)/(p.r1+2*p.r2))); osc1.frequency.value = frequency; osc1.connect(toneGain); osc1.start();
     nodes.push(toneGain, osc1);
     if (p.voices === "dual") {
       const osc2 = ctx.createOscillator();
-      osc2.type = "square"; osc2.frequency.value = clamp(result.secondFrequency, 20, 12000); osc2.connect(toneGain); osc2.start();
+      osc2.setPeriodicWave(timerWave(ctx,(p.r1+p.r2b)/(p.r1+2*p.r2b))); osc2.frequency.value = clamp(result.secondFrequency*Math.pow(2,state.globalOctave), 20, 12000); osc2.connect(toneGain); osc2.start();
       nodes.push(osc2);
     }
   } else if (instance.type === "fuzz" || instance.type === "overdrive" || instance.type === "distortion") {
@@ -1506,6 +1621,8 @@ function rebuildAudioGraph() {
     audio.moduleNodes.push(...processor.nodes);
   });
   previous.connect(audio.master);
+  audio.sequencerVoice?.voices.forEach(({osc,moduleId,second})=>{const m=state.modules.find(x=>x.id===moduleId);if(!m)return;const calc=calculateModule(m);osc.frequency.setTargetAtTime(clamp((second?calc.secondFrequency:calc.frequency)*Math.pow(2,((state.heldNote??48)-48)/12),10,16000),audio.context.currentTime,.004);});
+
 }
 
 async function toggleAudio() {
@@ -1570,7 +1687,7 @@ function drawScopes() {
       const rms=Math.sqrt(waveformData.reduce((sum,value)=>sum+Math.pow((value-128)/128,2),0)/waveformData.length);
       $(".brand-mark")?.classList.toggle("is-sounding",rms>.015);
     }
-    wave.strokeStyle = "#d7ff3f"; wave.lineWidth = 1.5 * w.ratio; wave.beginPath();
+    wave.strokeStyle = "#ffffff"; wave.lineWidth = 1.5 * w.ratio; wave.beginPath();
     waveformData.forEach((value, index) => {
       const x = index / (waveformData.length - 1) * w.width;
       const y = value / 255 * w.height;
@@ -1586,7 +1703,7 @@ function drawScopes() {
     for (let i = 0; i < count; i++) {
       const sourceIndex = Math.floor(Math.pow(i / count, 2) * freqData.length * .45);
       const height = freqData[sourceIndex] / 255 * s.height * .9;
-      bars.fillStyle = i % 5 === 0 ? "#d7ff3f" : "#61704d";
+      bars.fillStyle = i % 5 === 0 ? "#ffffff" : "#9ca5b1";
       bars.fillRect(i * (barWidth + gap), s.height - height, barWidth, height);
     }
   } else {
@@ -1752,7 +1869,8 @@ function renderHardwareSelector() {
   const preset = hardwarePreset();
   const supply = preset.controls.find((control) => control.key === "supply");
   $("#supply-select").innerHTML = supply.options.map((option) => `<option value="${option.value}"${Number(option.value) === Number(preset.values.supply) ? " selected" : ""}>${option.label}</option>`).join("");
-  $("#download-guide").href = preset.guide;
+  $("#download-guide").href = "#";
+  $("#download-guide").textContent="Export current build guide";
 }
 
 function selectedHardwareComponent(preset = hardwarePreset()) {
@@ -1840,8 +1958,8 @@ function hardwareCalculation(preset) {
     const clip = v.diode === "germanium" ? "about 0.3 V" : v.diode === "led" ? "about 1.8 V" : "about 0.7 V";
     return `<span>Calculated relationships · ${v.supply} V supply</span><strong>${gain.toFixed(1)}× gain · ${fc.toFixed(0)} Hz corner · ${(v.supply / 2).toFixed(1)} V bias</strong><code>|A| ≈ ${v.rf} kΩ / ${v.rin} kΩ; fc = 1/(2π×10 kΩ×${v.toneC} nF)</code><p>${v.diode} clipping model: ${clip}. Higher supply increases available op-amp headroom, but the TL072 is not rail-to-rail. Replace D1 and D2 together.</p>`;
   }
-  const rate = 1 / (2.2 * v.clockR * 1000 * v.clockC * 1e-6);
-  return `<span>Calculated RC estimate · ${v.supply} V supply</span><strong>${rate.toFixed(1)} Hz · approximately ${v.supply} V logic swing</strong><code>f ≈ 1 / (2.2 × ${v.clockR} kΩ × ${v.clockC} µF)</code><p>The 2.2 factor is an estimate. CD40106 thresholds vary with supply, device, temperature, and part tolerance, so physical rate will differ.</p>`;
+  const rate = 1 / (1.386294 * v.clockR * 1000 * v.clockC * 1e-6);
+  return `<span>Calculated RC estimate · ${v.supply} V supply</span><strong>${rate.toFixed(1)} Hz · approximately ${v.supply} V logic swing</strong><code>f ≈ 1 / (1.386 × ${v.clockR} kΩ × ${v.clockC} µF)</code><p>The 2.2 factor is an estimate. CD40106 thresholds vary with supply, device, temperature, and part tolerance, so physical rate will differ.</p>`;
 }
 
 function hardwareTestReport(preset = hardwarePreset()) {
@@ -2004,6 +2122,7 @@ function switchHardwareCircuit(id) {
 
 function renderIllustratedBom() {
   const preset = hardwarePreset();
+  syncPhysicalParts(preset);
   let total = 0;
   let missingTotal = 0;
   const filter = state.partsFilter.trim().toLowerCase();
@@ -2207,32 +2326,12 @@ async function applyHardwareChoice(key, rawValue) {
   announce(`${control.ref} changed to ${hardwareValueLabel(control, value)}. Sound model updated.`);
 }
 
-function schematicSvg(preset) {
-  const v = preset.values;
-  const header = `<svg class="technical-svg" viewBox="0 0 980 520" role="img" aria-label="${preset.name} labeled construction schematic"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z" fill="currentColor"/></marker></defs><rect width="980" height="520" fill="#f7f8f3"/><text x="34" y="42" class="svg-title">${preset.name}</text><text x="34" y="66" class="svg-note">${v.supply} V DC · TOP VIEW PIN REFERENCES · NOT PHYSICALLY TESTED</text>`;
-  if (preset.id === "dual555") return `${header}
-    <path class="rail plus" d="M70 100H910"/><text x="72" y="92">+${v.supply} V</text><path class="rail ground" d="M70 455H910"/><text x="72" y="478">GND</text>
-    <g transform="translate(185 145)"><rect class="ic-body" width="190" height="185"/><path d="M80 0q15 20 30 0" class="symbol"/><text x="95" y="90" text-anchor="middle" class="ic-name">U1 NE555P</text><text x="12" y="25">8 VCC</text><text x="12" y="165">1 GND</text><text x="125" y="25">4 RESET</text><text x="112" y="165">3 OUT</text><text x="12" y="58">7 DISCH</text><text x="12" y="126">2 TRIG</text><text x="116" y="126">6 THRES</text><text x="116" y="58">5 CONT</text></g>
-    <g transform="translate(610 145)"><rect class="ic-body" width="190" height="185"/><path d="M80 0q15 20 30 0" class="symbol"/><text x="95" y="90" text-anchor="middle" class="ic-name">U2 NE555P</text><text x="12" y="25">8 VCC</text><text x="12" y="165">1 GND</text><text x="125" y="25">4 RESET</text><text x="112" y="165">3 OUT</text><text x="12" y="58">7 DISCH</text><text x="12" y="126">2 TRIG</text><text x="116" y="126">6 THRES</text><text x="116" y="58">5 CONT</text></g>
-    <path class="wire" d="M220 145V100m120 45v-45M645 145v-45m120 45v-45M220 330v125M645 330v125"/>
-    <path class="wire blue" d="M197 203H130v70h67m166 0h70v88H320m302-158h-67v70h67m166 0h70v88H745"/>
-    <g class="component-label"><text x="78" y="188">R1 ${v.r1} kΩ</text><text x="76" y="226">P1 ${v.r2} kΩ</text><text x="370" y="382">C1 ${v.c} nF</text><text x="502" y="188">R3 ${v.r1} kΩ</text><text x="500" y="226">P2 ${v.r2b} kΩ</text><text x="796" y="382">C3 ${v.c} nF</text></g>
-    <path class="wire signal" d="M297 310v75h125m266-75v75H562m-140 0h140"/><rect x="454" y="365" width="76" height="40" class="component-box"/><text x="492" y="390" text-anchor="middle">MIX R5/R6</text><path class="wire signal" d="M530 385h145v45h160"/><text x="700" y="420">P3 ${v.mix}% → C5 → OUTPUT</text>${schematicHotspots(preset)}</svg>`;
-  if (preset.id === "opampFuzz") return `${header}
-    <path class="rail plus" d="M50 95H930"/><text x="55" y="86">+${v.supply} V</text><path class="rail ground" d="M50 460H930"/><text x="55" y="483">GND</text>
-    <path class="wire" d="M120 95v75m0 70v70m0 70v80"/><path class="resistor-symbol" d="M120 170l-10 7 20 12-20 12 20 12-10 7"/><path class="resistor-symbol" d="M120 310l-10 7 20 12-20 12 20 12-10 7"/><text x="138" y="198">R1 100 kΩ</text><text x="138" y="338">R2 100 kΩ</text><circle cx="120" cy="270" r="5"/><text x="140" y="276">VBIAS ≈ ${(v.supply/2).toFixed(1)} V</text>
-    <path class="wire purple" d="M120 270h160"/><path class="opamp" d="M280 225v90l95-45z"/><text x="295" y="251">+ 5</text><text x="295" y="298">− 6</text><text x="333" y="274">U1B</text><path class="wire purple" d="M375 270h75v75h-145v-48"/><text x="385" y="257">7 VREF ≈ ${(v.supply/2).toFixed(1)} V</text>
-    <path class="wire signal" d="M40 385h90"/><text x="42" y="375">INPUT</text><rect x="130" y="365" width="62" height="38" class="component-box"/><text x="161" y="389" text-anchor="middle">C2</text><path class="wire signal" d="M192 385h62"/><path class="resistor-symbol" d="M254 385l8-10 12 20 12-20 12 20 12-10h50"/><text x="260" y="420">R3 ${v.rin} kΩ</text>
-    <path class="opamp" d="M360 335v100l110-50z"/><text x="376" y="365">− 2</text><text x="376" y="415">+ 3</text><text x="413" y="389">U1A</text><path class="wire purple" d="M360 410H280V270"/><path class="wire signal" d="M470 385h92"/>
-    <path class="wire orange" d="M455 355v-72H330v72"/><path class="resistor-symbol" d="M355 283l8-10 12 20 12-20 12 20 12-10"/><text x="348" y="261">R4 ${v.rf} kΩ</text><path class="wire yellow" d="M350 320h84"/><path class="diode-symbol" d="M370 310v20l22-10zm22-10v40m20-30v20l-22-10zm-22-10v40"/><text x="350" y="345">D1/D2 ${v.diode} antiparallel</text>
-    <rect x="562" y="365" width="95" height="40" class="component-box"/><text x="609" y="389" text-anchor="middle">R5 10 kΩ</text><path class="wire signal" d="M657 385h78"/><path class="wire" d="M705 385v75"/><text x="674" y="440">C4 ${v.toneC} nF</text><path class="wire signal" d="M735 385h195"/><text x="755" y="374">P1 ${v.level}% → C3 → OUTPUT</text>${schematicHotspots(preset)}</svg>`;
-  return `${header}
-    <path class="rail plus" d="M60 95H920"/><text x="65" y="86">+${v.supply} V</text><path class="rail ground" d="M60 445H920"/><text x="65" y="470">GND</text>
-    <rect x="165" y="150" width="250" height="205" class="ic-body"/><text x="290" y="185" text-anchor="middle" class="ic-name">U1 CD40106BE · PDIP-14</text><path class="inverter" d="M240 225v80l95-40z"/><circle cx="346" cy="265" r="11" class="symbol"/><text x="205" y="270">1 A</text><text x="355" y="270">2 /A</text><text x="180" y="330">14 VDD → +${v.supply} V · 7 VSS → GND</text>
-    <path class="wire blue" d="M357 265h145v-105H210v65"/><path class="resistor-symbol" d="M410 160l8-10 12 20 12-20 12 20 12-10"/><text x="382" y="138">R1 1 kΩ + P1 ${v.clockR} kΩ</text><path class="wire" d="M210 265H110v180"/><path d="M90 355h40m-40 14h40" class="symbol"/><text x="62" y="342">C1</text><text x="54" y="390">${v.clockC} µF</text>
-    <path class="wire signal" d="M357 265h205"/><path class="resistor-symbol" d="M500 265l8-10 12 20 12-20 12 20 12-10"/><rect x="562" y="245" width="70" height="40" class="component-box"/><text x="597" y="270" text-anchor="middle">C2 1 µF</text><path class="wire signal" d="M632 265h270"/><text x="682" y="249">P2 ${v.depth}% → OUTPUT</text><text x="515" y="330">Unused inputs 3, 5, 9, 11, 13 → GND</text>${schematicHotspots(preset)}</svg>`;
+function physicalPlanForPreset(preset){
+  const v=preset.values;
+  const id=preset.id==='dual555'?'dual555':preset.id==='opampFuzz'?'fuzz':'tone40106';
+  return CircuitEngine.build(id,{supply:v.supply,ra:(v.r1||10)*1000,rb:(v.r2||v.clockR||22)*1000,rb2:(v.r2b||23)*1000,c:v.clockC?v.clockC*1e-6:(v.c||10)*1e-9,rf:(v.rf||470)*1000,rin:(v.rin||10)*1000,toneC:(v.toneC||22)*1e-9,diode:v.diode||'silicon'});
 }
-
+function schematicSvg(preset) {return schematicPlan(physicalPlanForPreset(preset));}
 function holePoint(hole) {
   const rail = hole[0] === "+" || hole[0] === "-";
   if (rail) return { x: 54 + (Number(hole.slice(1)) - 1) * 24, y: hole[0] === "+" ? 57 : 82 };
@@ -2256,36 +2355,7 @@ function placementValueLabel(preset, part) {
   return String(component?.value || part.label || "").replace(/,\s*.*/, "");
 }
 
-function breadboardSvg(preset) {
-  let holes = "";
-  for (let col = 1; col <= 30; col++) {
-    const x = 54 + (col - 1) * 24;
-    holes += `<text x="${x}" y="118" text-anchor="middle">${col}</text><circle cx="${x}" cy="57" r="3" class="rail-hole plus-hole"/><circle cx="${x}" cy="82" r="3" class="rail-hole ground-hole"/>`;
-    for (const y of [132,152,172,192,212,262,282,302,322,342]) holes += `<circle cx="${x}" cy="${y}" r="3.2" class="board-hole"/>`;
-  }
-  const letters = Object.entries({A:132,B:152,C:172,D:192,E:212,F:262,G:282,H:302,I:322,J:342}).map(([l,y])=>`<text x="20" y="${y+4}">${l}</text>`).join("");
-  const wires = preset.boardWires.map(([from,to,color],index) => { const a=holePoint(from), b=holePoint(to), path=`M${a.x} ${a.y} C${a.x} ${(a.y+b.y)/2} ${b.x} ${(a.y+b.y)/2} ${b.x} ${b.y}`; return `<g class="interactive-wire${state.selectedWireIndex === index ? " is-selected" : ""}" data-help-key="wire" data-wire-index="${index}" data-wire-ref="${from} → ${to}" role="button" tabindex="0" aria-label="Signal wire ${from} to ${to}. Click to add a sound stage."><title>${from} to ${to}: click to add a behavioral sound stage</title><path class="wire-hit" d="${path}"/><path class="board-wire ${color}" d="${path}"/><circle cx="${a.x}" cy="${a.y}" r="5" class="wire-end ${color}"/><circle cx="${b.x}" cy="${b.y}" r="5" class="wire-end ${color}"/></g>`; }).join("");
-  const parts = preset.placements.map((part) => {
-    if (part.kind.startsWith("dip")) {
-      const pins = part.kind === "dip14" ? 7 : 4;
-      const x = 54 + (part.col - 1) * 24 - 8;
-      const width = (pins - 1) * 24 + 16;
-      const pinLabels = Array.from({length:pins},(_,i)=>`<text x="${x+8+i*24}" y="253" text-anchor="middle">${i+1}</text><text x="${x+8+i*24}" y="228" text-anchor="middle">${pins*2-i}</text>`).join("");
-      return interactiveSvgGroup(part, `<g><rect x="${x}" y="218" width="${width}" height="38" class="board-ic"/><path d="M${x} 229q13 8 0 16" class="symbol"/><circle cx="${x+10}" cy="226" r="3" class="board-pin-one"/><text x="${x+width/2}" y="244" text-anchor="middle" class="board-label">${part.ref} ${part.label}</text>${pinLabels}</g>`);
-    }
-    const a=holePoint(part.from), b=holePoint(part.to), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-    const value = placementValueLabel(preset, part);
-    if (part.kind === "resistor") {
-      const bands = resistorBands(value).map(([name,color],index)=>`<rect class="board-resistor-band" x="${mx-14+index*7}" y="${my-8}" width="4" height="16" style="fill:${color}"><title>${name}</title></rect>`).join("");
-      return interactiveSvgGroup(part, `<g><path d="M${a.x} ${a.y}L${mx-22} ${my}m44 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-22}" y="${my-8}" width="44" height="16" rx="6" class="board-resistor"/>${bands}<text x="${mx}" y="${my-12}" text-anchor="middle" class="board-label">${part.ref} ${value}</text></g>`);
-    }
-    if (part.kind === "diode") return interactiveSvgGroup(part, `<g><path d="M${a.x} ${a.y}L${mx-20} ${my}m40 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-20}" y="${my-7}" width="40" height="14" class="board-diode"/><path d="M${mx+12} ${my-7}v14" class="diode-band"/><text x="${mx}" y="${my-12}" text-anchor="middle" class="board-label">${part.ref} ${value}</text></g>`);
-    if (part.kind === "electrolytic") return interactiveSvgGroup(part, `<g><path d="M${a.x} ${a.y}L${mx-12} ${my}m24 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-12}" y="${my-14}" width="24" height="28" rx="5" class="board-electrolytic"/><rect x="${mx+5}" y="${my-14}" width="5" height="28" class="board-electrolytic-stripe"/><text x="${mx-17}" y="${my-9}" class="board-polarity">+</text><text x="${mx}" y="${my-18}" text-anchor="middle" class="board-label">${part.ref} ${value}</text></g>`);
-    return interactiveSvgGroup(part, `<g><path d="M${a.x} ${a.y}L${mx-13} ${my}m26 0L${b.x} ${b.y}" class="part-lead"/><rect x="${mx-13}" y="${my-12}" width="26" height="24" rx="3" class="board-film-cap"/><text x="${mx}" y="${my+3}" text-anchor="middle" class="board-component-value">${String(value).replace(/\s.*/,"")}</text><text x="${mx}" y="${my-17}" text-anchor="middle" class="board-label">${part.ref} ${value}</text></g>`);
-  }).join("");
-  return `<svg class="technical-svg breadboard-svg" viewBox="0 0 790 410" role="img" aria-label="${preset.name} breadboard placement, top view"><rect x="4" y="20" width="780" height="370" rx="8" class="breadboard-body"/><path d="M35 232H765" class="board-trench"/><path d="M35 57H765M35 82H765" class="board-rail"/><text x="20" y="61" class="plus-text">+</text><text x="20" y="86" class="minus-text">−</text>${letters}${holes}${wires}${parts}<text x="395" y="382" text-anchor="middle" class="svg-note">TOP VIEW · BB830-STYLE · VERIFY RAIL CONTINUITY · CONNECTION TABLE IS AUTHORITATIVE</text></svg>`;
-}
-
+function breadboardSvg(preset) {return boardSvg(physicalPlanForPreset(preset));}
 function dynamicSupplyText(text, preset) {
   return String(text)
     .replaceAll("+9V", `+${preset.values.supply}V`)
@@ -2344,7 +2414,7 @@ function synthBoardSvg(item) {
     const pins = Array.from({length:4},(_,pin)=>`<path d="M${point.x-35+pin*23} ${point.y-38}v-10M${point.x-35+pin*23} ${point.y+38}v10" class="synth-board-pin"/>`).join("");
     return `<g class="synth-board-block"><title>${point.block}</title><rect x="${point.x-54}" y="${point.y-38}" width="108" height="76" rx="5"/><path d="M${point.x-10} ${point.y-38}q10 12 20 0" class="synth-board-notch"/>${pins}<text x="${point.x}" y="${point.y-4}" text-anchor="middle">${String(index+1).padStart(2,"0")}</text><text x="${point.x}" y="${point.y+15}" text-anchor="middle" class="synth-board-name">${shortLabel}</text></g>`;
   }).join("");
-  const components = Array.from({length:18},(_,index)=>{const x=48+(index%9)*96,y=index<9?68:300;return index%3===0?`<g><path d="M${x-22} ${y}h10l5-7 10 14 10-14 5 7h10" class="synth-board-part"/><text x="${x}" y="${y-12}" text-anchor="middle">R${index+1}</text></g>`:`<g><path d="M${x-18} ${y}h14m8 0h14M${x-4} ${y-10}v20M${x+4} ${y-10}v20" class="synth-board-part"/><text x="${x}" y="${y-12}" text-anchor="middle">C${index+1}</text></g>`;}).join("");
+  const components = "";
   return `<svg class="technical-svg synth-board-svg" viewBox="0 0 900 370" role="img" aria-label="${item.name} educational functional circuit board"><rect x="8" y="8" width="884" height="354" rx="7" class="synth-board-pcb"/><path d="M30 38H870M30 334H870" class="synth-board-rail"/><text x="34" y="31">+V</text><text x="34" y="352">GND</text>${components}${traces}${blocks}<text x="450" y="345" text-anchor="middle" class="synth-board-caption">EDUCATIONAL FUNCTIONAL MAP · NOT A PCB LAYOUT OR CONSTRUCTION SCHEMATIC</text></svg>`;
 }
 
@@ -2382,7 +2452,7 @@ function synthReferenceView() {
   const choices=[...EFFECT_CIRCUITS,...SYNTH_REFERENCES];
   const selected = choices.find((item)=>item.id===state.selectedSynthReference) || choices[0];
   const list=(items,label)=>`<span class="synth-list-heading">${label}</span>${items.map((item)=>`<button type="button" class="synth-reference-card${item.id===selected.id?" is-selected":""}" data-synth-reference="${item.id}" aria-pressed="${item.id===selected.id}">${effectFolderPreview(item)}<span>${item.maker}</span><strong>${item.name}</strong><small>${item.status}</small></button>`).join("")}`;
-  const detail=selected.moduleType?effectCircuitDetail(selected):`<article class="synth-circuit-viewer"><header><div><span>${selected.maker}</span><h3>${selected.name}</h3></div><b>${selected.status}</b></header><div class="synth-board-wrap">${synthBoardSvg(selected)}</div><div class="synth-flow">${selected.blocks.map((block,index)=>`<span>${block}${index<selected.blocks.length-1?`<i>→</i>`:""}</span>`).join("")}</div><p>${selected.note}</p><a href="${selected.source}" target="_blank" rel="noopener noreferrer">View the exact official source ↗</a></article>`;
+  const detail=selected.moduleType?effectCircuitDetail(selected):`<article class="synth-circuit-viewer"><header><div><span>${selected.maker}</span><h3>${selected.name}</h3></div><b>${selected.status}</b></header><div class="synth-board-wrap">${synthBoardSvg(selected)}</div><div class="synth-flow">${selected.blocks.map((block,index)=>`<span>${block}${index<selected.blocks.length-1?`<i>→</i>`:""}</span>`).join("")}</div><p>${selected.note}</p>${selected.source.toLowerCase().endsWith(".pdf")?`<details class="official-source"><summary>Read official schematic / manual in this app</summary><iframe title="${selected.name} official document" src="${selected.source}" loading="lazy"></iframe><p>If the manufacturer blocks embedding, use the source link below.</p></details>`:""}<a href="${selected.source}" target="_blank" rel="noopener noreferrer">View the exact official source ↗</a></article>`;
   return `<section id="construction-synths" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Clickable circuit explorer</p><h2>Effect and synth circuits</h2></div><span>Select a folder to display its circuit and parts</span></div><p class="synth-reference-boundary">Studio effect folders expose switchable behavioral components and calculations. Manufacturer references show documented signal flow and link the official source; they are not presented as construction-ready PCB layouts.</p><div class="synth-explorer"><nav class="synth-reference-list" aria-label="Effect and synth circuit choices">${list(EFFECT_CIRCUITS,"Studio effect circuits")}${list(SYNTH_REFERENCES,"Manufacturer references")}</nav>${detail}</div></section>`;
 }
 
@@ -2396,9 +2466,9 @@ function renderConstruction() {
   const views = {
     breadboard: `<section id="construction-breadboard" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Physical layout</p><h2>${preset.name} breadboard</h2></div><span>Click any part to inspect it · editable values open the illustrated library</span><button class="inline-circuit-test" type="button" data-test-circuit>Test circuit</button></div><div class="canvas-zoom-surface">${breadboardSvg(preset)}${renderPotControls(preset)}</div><p class="graphic-caption"><strong>Main circuit-bending workflow:</strong> select a part, install a supported value, hear the behavioral result, then use Test circuit before building. Wire clicks can add behavioral sound stages; physical wiring stays locked to the audited preset.</p></section>`,
     schematic: `<section id="construction-schematic" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Electrical view</p><h2>${preset.name} schematic</h2></div><span>Click highlighted parts to inspect them; editable parts open substitutions</span><button class="inline-circuit-test" type="button" data-test-circuit>Test circuit</button></div><div class="canvas-zoom-surface">${schematicSvg(preset)}</div><p class="graphic-caption"><strong>Calculated and browser-simulated:</strong> values, formulas, BOM, and supported sound parameters stay synchronized. This is not a physically measured result.</p></section>`,
-    connections: `<section id="construction-connections" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Authoritative netlist</p><h2>Wire-by-wire connections</h2></div><span>${preset.connections.length} audited nets</span></div><div class="connection-table-wrap"><table class="connection-table"><thead><tr><th>Net</th><th>Connection path</th><th>Wire</th><th>Check</th></tr></thead><tbody>${preset.connections.map((row)=>`<tr><td><strong>${dynamicSupplyText(row[0],preset)}</strong></td><td>${row.slice(1,-2).map((cell)=>dynamicSupplyText(cell,preset)).join(" → ")}</td><td><span class="wire-swatch ${row.at(-2)}"></span>${row.at(-2)}</td><td>${dynamicSupplyText(row.at(-1),preset)}</td></tr>`).join("")}</tbody></table></div></section>`,
+    connections: `<section id="construction-connections" class="construction-section workspace-view"><h2>Exact-hole connections · canonical physical plan</h2>${connectionsPlan(physicalPlanForPreset(preset))}</section>`,
     pinouts: `<section id="construction-pinouts" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Manufacturer sources</p><h2>Package orientation and pins</h2></div><span>Top view · confirm notch before power</span></div>${pinouts}</section>`,
-    assembly: `<section id="construction-assembly" class="construction-section workspace-view"><div class="graphic-heading"><div><p class="evidence-label">Guided physical build</p><h2>Assemble with power disconnected</h2></div><span>Follow, verify, and check one step at a time</span></div>${assemblyTutorial(preset)}</section>`,
+    assembly: `<section id="construction-assembly" class="construction-section workspace-view"><h2>Power-off assembly · same circuit as the drawing</h2>${assemblyPlan(physicalPlanForPreset(preset))}</section>`,
     synths: synthReferenceView()
   };
   panel.innerHTML = views[state.constructionView] || views.breadboard;
@@ -2415,8 +2485,27 @@ function renderHardwareSources() {
   $("#hardware-sources").innerHTML = `<strong>Pinout sources</strong>${preset.sources.map(([label,url])=>`<a href="${url}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`).join("")}`;
 }
 
+function physicalComponentControl(c,preset){
+ if(preset.id==='dual555'){
+  if(c.ref.endsWith(' RA'))return 'r1';if(c.ref==='U1A RB')return 'r2';if(c.ref==='U2A RB')return 'r2b';if(c.ref.endsWith(' timing C'))return 'c';
+ }else if(preset.id==='opampFuzz')return {'input R':'rin','feedback R':'rf','tone C':'toneC','D1':'diode','D2':'diode'}[c.ref];
+ else return {'U1 R1':'clockR','U1 C1':'clockC'}[c.ref];
+ return null;
+}
+function syncPhysicalParts(preset){
+ const plan=physicalPlanForPreset(preset);
+ const parts=plan.chips.map(c=>({ref:c.ref,kind:'dip'+CircuitEngine.CHIPS[c.type].pins.length,name:c.type,value:'PDIP-'+CircuitEngine.CHIPS[c.type].pins.length,qty:1,cost:1.2,query:c.type,note:CircuitEngine.CHIPS[c.type].role}));
+ for(const c of plan.components){
+  const key=physicalComponentControl(c,preset),control=preset.controls.find(x=>x.key===key);
+  parts.push({ref:c.ref,kind:c.kind==='pot'?'pot':c.kind==='switch'?'switch':c.kind,name:c.ref,value:CircuitEngine.value(c.value),...(key?{valueKey:key,suffix:control?.unit?' '+control.unit:''}:{}),qty:1,cost:c.kind==='resistor'?.1:c.kind==='pot'?1.65:.25,query:c.kind+' '+CircuitEngine.value(c.value),note:`Terminals: ${plan.layout.leads[c.ref].join(' → ')}. Nets: ${c.nets.join(' → ')}.`});
+ }
+ parts.push({ref:'BB1',kind:'breadboard',name:'BusBoard BB400',value:'400 tie points',qty:1,cost:8,query:'BusBoard BB400 breadboard',note:'30 terminal columns, four 25-point power rails.'},{ref:'PS1',kind:'supply',name:'Regulated DC supply',valueKey:'supply',suffix:' V',qty:1,cost:9.5,query:'current limited DC supply',note:'Confirm polarity and selected voltage.'},{ref:'J1',kind:'jack',name:'Audio output jack',value:'High-impedance powered input',qty:1,cost:1.1,query:'mono panel audio jack',note:'OUTPUT to tip, GND to sleeve.'});
+ if(preset.id==='opampFuzz')parts.push({ref:'J2',kind:'jack',name:'Audio input jack',value:'Signal input',qty:1,cost:1.1,query:'mono panel audio jack',note:'INPUT to tip, GND to sleeve.'});
+ preset.components=parts;
+}
 function renderHardware() {
   const preset = hardwarePreset();
+  syncPhysicalParts(preset);
   if (!preset.defaultValues) preset.defaultValues = { ...preset.values };
   renderHardwareSelector();
   renderHardwareControls();
@@ -2528,6 +2617,7 @@ function deviceChecks(controller, devices) {
   const ids = new Set(devices.map((device) => device.id));
   if (!devices.length) return [{severity:"info",title:"Choose devices",text:"Add at least one sensor, output, chip, or module to generate a pre-build plan."}];
   devices.forEach((device) => {
+    if(device.standalone){checks.push({severity:"warn",title:device.name+": standalone design",text:"Use a supported circuit plan and its exact supply. This planner does not assign direct GPIO wiring for this audio IC."});return;}
     const analogBridge = controller.noAdc && device.interfaces.includes("analog") && ids.has("mcp3008");
     const supported = analogBridge || device.interfaces.some((name) => controller.interfaces.includes(name));
     if (!supported) checks.push({severity:"stop",title:`${device.name}: interface unavailable`,text:`${controller.name} does not expose a supported ${device.interfaces.join(" / ")} interface in this planner.`});
@@ -2551,6 +2641,7 @@ function deviceChecks(controller, devices) {
 }
 
 function suggestedDeviceConnection(controller, device, devices) {
+  if(device.standalone)return {iface:'STANDALONE AUDIO CIRCUIT',pins:'Use Chip combinations / exact netlist',support:device.note+' Outputs require a qualified audio or level-shifting interface before any GPIO connection.'};
   const ids = new Set(devices.map((item) => item.id));
   let iface = device.interfaces.find((name) => controller.interfaces.includes(name));
   if (controller.noAdc && device.interfaces.includes("analog") && ids.has("mcp3008")) iface = "spi";
@@ -2694,19 +2785,20 @@ function bindEvents() {
   $("#sequencer-stop").addEventListener("click", stopSequencerTransport);
   $("#synth-profile").addEventListener("change", async (event) => {
     applySynthProfile(event.target.value);
+    state.sequenceTarget="voice";$("#sequence-target").value="voice";
     if (state.sequencerRunning) await startSource();
   });
   $("#synth-waveform").addEventListener("change", async (event) => { state.synthWaveform = event.target.value; if (state.sequencerRunning) await startSource(); });
   $("#voice-parameter-knobs").addEventListener("input",(event)=>{const control=event.target.closest("[data-voice-param]");if(control)updateVoiceParameter(control.dataset.voiceParam,control.value);});
   $("#arp-mode").addEventListener("change", (event) => { state.arpMode = event.target.value; });
   $("#midi-bpm").addEventListener("input", (event) => { state.midiBpm = clamp(Number(event.target.value)||120,30,300); syncTempoCoach(state.midiBpm); });
-  $("#midi-bpm").addEventListener("change", async (event) => { setMidiTempo(event.target.value); if(state.sequencerRunning) await startSource(); });
-  $(".tempo-presets [data-tempo-preset]").forEach((button)=>button.addEventListener("click",async()=>{
+  $("#midi-bpm").addEventListener("change", async (event) => { setMidiTempo(event.target.value); if(state.sequencerRunning) syncTempoCoach(); });
+  $$(".tempo-presets [data-tempo-preset]").forEach((button)=>button.addEventListener("click",async()=>{
     const bpm=Number(button.dataset.tempoPreset);
     setMidiTempo(bpm);
-    $(".tempo-presets button").forEach((item)=>item.classList.toggle("is-active",item===button));
+    $$(".tempo-presets button").forEach((item)=>item.classList.toggle("is-active",item===button));
     announce(`${button.dataset.tempoLabel} tempo selected: ${bpm} BPM.`);
-    if(state.sequencerRunning) await startSource();
+    if(state.sequencerRunning) syncTempoCoach();
   }));
   const tempoKnob = $("#tempo-knob");
   let tempoDrag = null;
@@ -2723,14 +2815,14 @@ function bindEvents() {
     if (!tempoDrag) return;
     tempoDrag = null;
     tempoKnob.releasePointerCapture?.(event.pointerId);
-    if (state.sequencerRunning) await startSource();
+    if (state.sequencerRunning) syncTempoCoach();
   };
   tempoKnob?.addEventListener("pointerup", finishTempoDrag);
   tempoKnob?.addEventListener("pointercancel", finishTempoDrag);
   tempoKnob?.addEventListener("wheel", async (event) => {
     event.preventDefault();
     setMidiTempo(state.midiBpm + (event.deltaY < 0 ? 1 : -1));
-    if (state.sequencerRunning) await startSource();
+    if (state.sequencerRunning) syncTempoCoach();
   }, { passive: false });
   tempoKnob?.addEventListener("keydown", async (event) => {
     const amount = event.shiftKey ? 5 : 1;
@@ -2739,9 +2831,9 @@ function bindEvents() {
     if (event.key === "Home") setMidiTempo(30);
     else if (event.key === "End") setMidiTempo(300);
     else setMidiTempo(state.midiBpm + (["ArrowUp","ArrowRight"].includes(event.key) ? amount : -amount));
-    if (state.sequencerRunning) await startSource();
+    if (state.sequencerRunning) syncTempoCoach();
   });
-  $("#step-division").addEventListener("change", async (event) => { state.stepDivision=Number(event.target.value); if(state.sequencerRunning) await startSource(); });
+  $("#step-division").addEventListener("change", async (event) => { state.stepDivision=Number(event.target.value); if(state.sequencerRunning) syncTempoCoach(); });
   $("#pattern-duration").addEventListener("change", (event) => { state.patternDuration=clamp(Number(event.target.value)||0,0,5); event.target.value=state.patternDuration; });
   $("#start-delay").addEventListener("change", (event) => { state.startDelay=event.target.value; });
   $$("[data-pattern-bar]").forEach((button)=>button.addEventListener("click",()=>{state.sequencerBar=Number(button.dataset.patternBar);renderSequencer();}));
@@ -2788,6 +2880,8 @@ function bindEvents() {
     if(action==="randomize") return randomizePattern(false);
     if(action==="glitch") return randomizePattern(true);
     state.performance[action]=!state.performance[action];
+    if(action==='repeat'){state.repeatStart=Math.floor(state.sequencerStep/state.repeatLength)*state.repeatLength;state.repeatCursor=0;}
+    if(action==='freeze'&&state.performance.freeze)gateSynthNote(state.heldNote,null,'freeze');
     performance.setAttribute("aria-pressed",String(state.performance[action]));
     if(action==="mute" && audio.sequencerVoice && state.performance.mute) gateSynthNote(null, null, "mute");
   });
@@ -3022,6 +3116,8 @@ function bindEvents() {
     if(!item) return;
     const parameter=MODULES[item.moduleType].params.find((entry)=>entry.key===control.dataset.effectCircuitParam);
     state.effectCircuitValues[item.moduleType][parameter.key]=parameter.type==="select"?control.value:Number(control.value);
+    state.modules.filter(m=>m.type===item.moduleType).forEach(m=>m.params[parameter.key]=state.effectCircuitValues[item.moduleType][parameter.key]);
+    renderChain();renderInspector();renderBom();rebuildAudioGraph();
     renderConstruction();
     announce(`${parameter.label} changed in the ${item.name} study circuit.`);
   });
@@ -3178,6 +3274,7 @@ function bindEvents() {
   $("#experiment-form").addEventListener("reset", () => { window.setTimeout(() => { $("#experiment-output").textContent = ""; }, 0); });
 }
 
+$("#synth-waveform").value=state.synthWaveform;
 renderLibrary();
 renderSynthKeyboard();
 renderMacroPanel();
@@ -3189,9 +3286,9 @@ renderHardware();
 loadHardwareSound();
 syncAudioButtons();
 const initialView = window.location.hash.slice(1);
-showView(["studio", "learn", "build", "hardware", "devices", "experiment"].includes(initialView) ? initialView : "hardware");
+showView(["studio", "learn", "build", "hardware", "devices", "experiment", "combinations"].includes(initialView) ? initialView : "hardware");
 window.addEventListener("hashchange", () => {
   const view = window.location.hash.slice(1);
-  if (["studio", "learn", "build", "hardware", "devices", "experiment"].includes(view)) showView(view);
+  if (["studio", "learn", "build", "hardware", "devices", "experiment", "combinations"].includes(view)) showView(view);
 });
 drawScopes();

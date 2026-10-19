@@ -1,10 +1,13 @@
 {
   "name": "circuit-bending-sound-designer",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Interactive educational sound-effects and component laboratory",
   "scripts": {
-    "test": "node tests/smoke-test.mjs && node tests/hardware-audit.mjs && node tests/resistor-band-audit.mjs && node tests/sequencer-audit.mjs && node tests/studio-controls-audit.mjs && node tests/device-planner-audit.mjs",
+    "test": "node tests/smoke-test.mjs && node tests/circuit-engine-audit.mjs && node tests/resistor-band-audit.mjs && node tests/sequencer-audit.mjs && node tests/studio-controls-audit.mjs && node tests/device-planner-audit.mjs && node tests/runtime-audit.mjs",
     "start": "python -m http.server 8000"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
   }
 }
