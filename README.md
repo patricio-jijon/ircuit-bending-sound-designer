@@ -1,135 +1,66 @@
 # Circuit Bending Sound Designer
 
-An accessible, browser-based sound laboratory for exploring how component values influence oscillator, fuzz, overdrive, distortion, octave, delay, and glitch behaviors. Effects can be duplicated, reordered, bypassed, and combined while audio is running.
+A browser sound studio and guided physical-computing workbench. Build a tone, change a component, and compare the predicted relationship with a behavioral audio preview.
 
-## Run locally
+## Run
 
-Open `index.html` in a current Chrome, Edge, Firefox, or Safari browser. The built-in riff, test oscillator, calculations, budgeting, CSV export, and STL export work without a server.
+Open `index.html`, or run `python3 -m http.server 8000` and visit `http://localhost:8000/#studio`. Use localhost or HTTPS for microphone and Web MIDI. There are no production dependencies or build step.
 
-Microphone access is more dependable from a secure origin. For local microphone testing, run a small local server in this directory:
+## Studio
 
-```bash
-python -m http.server 8000
-```
+- Eight macro knobs, Command+M learn mode, MIDI CC assignment, explicit Clear controls, and MIDI note input.
+- Two editable 16-step bars, a chromatic light grid, per-step −2…+2 octave offsets, arpeggiator −3…+3 and global −3…+3 octave controls.
+- Pattern, Up, Down, Random and Glitch modes; gate length, swing, count-in, duration and 1/8–1/32 rates.
+- Repeat loops the selected 1/2/4/8/16/32-step phrase. Freeze holds the last note; Mute closes the envelope. These do not capture or loop recorded microphone audio.
+- Select the chain oscillators, an individual oscillator, a named synth voice, guitar rhythmic gating, or guitar-pitch-driven synth notes. Component-pitch mode treats C3 as the untransposed RC oscillator frequency. Voice mode follows equal-tempered MIDI pitch.
+- Guitar pitch tracking expects a clear single note around 65–1400 Hz. It drives a generated synth voice; it does not pitch-shift the original guitar recording. Gate mode chops the original incoming audio through the effect chain.
+- Chorus, flanger and four-stage phaser behavioral effects, plus the existing fuzz, distortion, overdrive, octave, delay, glitch and filter models.
+- Dancers and four beat lights follow the sequencer clock. Stop ends their movement. A reduced-motion preference disables dancer movement.
+- Presets / My Circuits stores sounds and chip designs in this browser. Save, load, rename, duplicate, delete, export and import. Audio files and microphone recordings are not stored in a preset. Export backups before clearing browser data.
 
-Then open `http://localhost:8000`.
+## Physical circuit workbench
 
-## Publish with GitHub Pages
+`circuit-engine.js` is the authoritative netlist and placement generator. Its data drives the breadboard, complete net-label schematic, parts list, exact-hole connection table, assembly checklist and circuit preview settings. `combination-ui.js` renders the plan and exposes supported substitutions.
 
-1. Create a GitHub repository and add these files at the repository root.
-2. In the repository, open **Settings → Pages**.
-3. Under **Build and deployment**, select **Deploy from a branch**.
-4. Choose the `main` branch and `/ (root)`, then save.
+Twelve guided designs:
 
-GitHub will provide the public URL after deployment completes.
+1. Single 555 tone.
+2. Single 555 HIGH/MUTE teaching circuit (a new documented design, not a reconstruction of the unavailable reference PDF).
+3. Two 555s mixed through isolation resistors.
+4. Two 555s: audio timer with a slow RESET gate.
+5. Three 555s: carrier, RESET gating and resistively limited CONTROL modulation.
+6. NE556 dual-timer tone pair with its exact PDIP-14 pinout.
+7. CD40106 single RC tone.
+8. CD40106 three-voice cluster.
+9. CD4093 enabled RC tone.
+10. NE555 + CD40106 pitch modulation.
+11. TL072 biased diode distortion.
+12. CD40106 + SN74HC164 + SN74HC86 + NE555 pseudorandom pitch. This design is **5 V only**. Clear the shift register using its reset switch, then release it. Its inverted-feedback sequence repeats after 255 states.
 
-## Included features
+The BB400 view has 30 × 10 terminal holes, separate A–E/F–J strips, a center trench, and four 25-point supply rails. Top rails use `+`/`−`; bottom rails use `b+`/`b−`. Rail bridges are explicit. Every component, chip leg and jumper endpoint has its own physical hole. Pin 1 is marked and all chip notches face left on the breadboard; schematic package views use notch-up physical pin order. Matching schematic net names are electrical connections.
 
-- Unlimited combinable instances of oscillator / dual NE555, fuzz, overdrive, distortion, octave, delay, and glitch modules
-- Reordering, bypass, deletion, a demonstration preset, and input/output level control
-- Built-in sound, test oscillator, local audio-file playback, and microphone/audio-interface input
-- Real-time Web Audio processing, oscilloscope, and spectrum display
-- Component controls with substituted formulas and plain-language explanations
-- Quantity-aware concept BOM, editable USD estimates, Amazon US search links, and CSV export
-- Dimension-based generic open-top enclosure STL export
-- Hardware Lab with synchronized schematics, named breadboard holes, canonical connection tables, power-off assembly steps, component illustrations, and preset-specific Amazon searches
-- Circuit Builder opens first and keeps the selected preset connected to the browser sound model
-- Tinkercad-inspired physical workspace with a searchable parts library, single breadboard/schematic canvas, contextual component inspector, zoom, and undo/redo
-- Device Planner with seven exact controller boards, twenty-five supported chips/devices, mixed-device selection, compatibility blockers, and suggested connection plans
-- Illustrated replacement browser with search, category and subcategory filters; opens from Change buttons or Ctrl-click on supported components
-- Direct component clicks open the matching replacement list; colored breadboard wires open a behavioral sound-stage library whose additions affect live browser audio
-- Realistic SVG parts include five-band 1% resistor colors derived from the installed value, package-style ICs, polarized electrolytics, film capacitors, diodes, supplies, and three selectable knob styles
-- Verified circuit folders group oscillator and distortion builds; 5 V, 9 V, and 12 V supply choices are limited by the selected circuit and synchronize calculations, labels, BOM values, and modeled output scale
-- Contextual engineering help opens on component hover or keyboard focus and provides paged advice for mixing, timing, filtering, clipping, polarity, headroom, and safe supply selection
-- Off-board potentiometers turn by pointer drag, mouse wheel, or arrow keys; a simple click opens illustrated, selectable values without confusing a drag for a selection
-- The Assembly tab is a guided Prepare → Place → Wire → Inspect → Test tutorial with progress, per-step checks, meter guidance, and safe off-board potentiometer-lug instructions adapted from the supplied construction references
-- Studio includes a two-bar, 32-step MIDI-style light grid, separate 16-step Bar 1 and Bar 2 note/rest editors, 30–300 BPM clock, 1/8–1/32 divisions, immediate/1–3 second/two-bar starts, 0–5 minute runs, pattern/up/down/random/glitch arpeggiation, and Repeat/Freeze/Mute performance switches
-- A two-octave black-and-white keyboard plays the selected synth voice through the complete movable effects chain; sequencer notes use explicit note-on/note-off gating and silence the chain oscillator's unrelated continuous drone
-- Eight top-mounted macro knobs support on-screen assignment and Web MIDI Control Change learning. Press Command+M, arm a macro, then select a violet module parameter or move an external MIDI control
-- Every signal-chain module has a direct delete control, and the enlarged 555 logo renders a live waveform from the same Web Audio analyser used by the oscilloscope
-- Voice presets include 555 pulse, Moog lead/bass, Korg lead/delay, Yamaha FM bell/bass, Arturia, and Casio behaviors with adjustable cutoff, resonance, attack, release, FM amount, and sub level
-- Studio modules now include behavioral Moog-style ladder, Korg monotron-style VCF, and Arturia-style Steiner/feedback filters; cards can be dragged or moved with directional controls while up/down changes the main effect amount
-- Circuit Builder includes a clickable in-app circuit explorer for the NE555 oscillator, Moog Werkstatt and Matriarch delay, Korg monotron/DUO/DELAY, Arturia MicroBrute, Yamaha MODX, and Casio MZ-X. Selecting a tile displays a labeled functional board map and its official source; published schematics remain clearly separated from architecture-only references
-- The Effect & synth circuits view adds interactive folders for all ten Studio sound stages, illustrated resistor/capacitor/diode/pot controls, live calculations, and an Add to Studio command. Behavioral folders are labeled separately from the three audited physical breadboard builds
-- Resistor, capacitor, potentiometer, diode-material, and transistor-model exploration controls
-- STEM Center inventory status for stocked, unverified, and additional-purchase parts, with separate purchase estimate
-- Breadboard, schematic, connections, pinouts, and assembly are focused workspace views rather than one long document
-- Click/tap component editing directly on the schematic, breadboard, off-board knobs, and adjustable parts-tray entries (right-click remains supported)
-- Engineering-series replacement menus synchronized with calculations, drawings, BOM, STEM inventory status, and browser audio
-- Visible off-board potentiometer controls; P1 and P2 independently set the two physical NE555 timing networks
-- Three physical-build presets: Dual 555 Drone, TL072 Diode Fuzz, and 40106 Glitch Clock
-- Guided prediction, observation, and reflection activity
-- Keyboard focus, semantic controls, responsive layouts, and reduced-motion support
+Potentiometers use terminal 1 and terminal 2 (wiper), with terminal 3 tied to the wiper as a rheostat. Electrolytic terminal 1 is positive; diode terminal 2 is the cathode. Output plans include AC coupling and attenuation for a high-impedance powered input. Disconnect power before editing.
 
-## Important modeling notes
+The original three Circuit Builder selections also use the generated physical plan. Export current build guide generates a printable HTML document from the current netlist. The PDFs retained in `guides/` are archived historical documents and may not match the new placement.
 
-The sound is a real-time **digital behavioral simulation** driven by the same component values shown in the build documents. Formulas shown as calculated are circuit relationships; the waveform and spectrum are simulated browser audio. The app does not claim physical measurements or transistor-level simulation. A physical circuit will follow the same value-to-behavior relationship, but an identical recording requires calibration for actual component tolerance, transistor gain, supply voltage, source level, and output loading.
+### Model boundary
 
-The bill of materials is a concept budget, not a construction-ready circuit. Amazon prices are not fetched automatically and can change. Verify part values, package, voltage and power ratings, pinouts, polarity, availability, and seller before buying or building.
+Connection checks verify named nets, pin power, supported supplies, endpoint occupancy and strip continuity. These circuits have **not been physically assembled or measured**. Browser audio is an approximation: component tolerance, oscillator thresholds, duty cycle, bias, loading, diode characteristics and supply headroom affect actual results. Schmitt frequency is estimated using nominal 1/3 and 2/3 supply thresholds, rather than asserted to be exact.
 
-The **Circuit Builder** is more specific than the freeform sound studio. Its three physical presets use named through-hole IC variants and manufacturer pinout sources. They are calculated and diagram-audited but have not been physically assembled or measured. Freeform octave, delay, transistor substitutions, and combined DSP chains remain simulation-only until separate hardware designs are validated.
+Manufacturer reference folders distinguish functional architecture from authentic schematics. PDF sources can be opened inside the reference viewer where the source allows embedding. The app does not invent manufacturer PCB traces.
 
-The downloaded STL is a generic reference shell made from the entered dimensions. It has no connector or control cutouts. Measure exact physical components and verify manufacturer mechanical drawings before fabrication.
+CD4046 VCO/PLL, CD4017 sequencers, CD4040 dividers, LM13700 OTA, PT2399 and BBD delay hardware are capability studies with primary datasheet links; complete physical templates are not provided for those parts yet. Browser chorus/flanger/phaser models do not claim to implement a verified physical design. Beating tones are not a true chorus delay. Pseudorandom sequences are not true noise.
 
-## Safety
+## Verification and deployment
 
-Keep physical experiments between 3.3 V and 12 V DC. Disconnect power before changing a breadboard, check polarized components, avoid short circuits, and use a current-limited supply when practical. Microphone and uploaded-file audio stays in the browser and is not sent by this static app.
+Install test dependencies with `npm ci`, then run `npm test`.
 
-## Technical reference
+The checks include:
+- Complete DOM startup and actual DOM control events using jsdom.
+- Audio graph/envelope calls using an instrumented Web Audio test double. This verifies scheduling and routing logic, not audible fidelity or a real audio device.
+- 2,025 envelope combinations including 300 BPM at 1/32 notes.
+- Guitar pitch detection against generated single-tone samples and silence.
+- All twelve generated plans, correct DIP hole mapping, RC scaling, explicit supply limits, and rejection of disconnected/shorted placement mutations.
+- Preset save/recall, repeat/mute, both guitar input paths and modulation effects.
 
-- [Texas Instruments NE555 datasheet](https://www.ti.com/lit/ds/symlink/ne555.pdf)
-- [Texas Instruments TL072 product and datasheet](https://www.ti.com/product/TL072)
-- [Texas Instruments CD40106B datasheet](https://www.ti.com/lit/ds/symlink/cd40106b.pdf)
-
-## Project structure
-
-- `index.html` — accessible application structure
-- `styles.css` — responsive visual system
-- `app.js` — module definitions, audio graph, calculations, budget, and exports
-- `hardware-data.js` — exact hardware preset inventories, connections, placements, assembly steps, and sources
-- `devices-data.js` — supported controller, IC, sensor, actuator, display, and interface catalog with compatibility metadata
-
-No dependencies or build step are required.
-
-## Learning objectives
-
-After using the app, a student should be able to:
-
-- explain that a component's circuit position determines its effect;
-- predict how an RC timing network responds to resistance or capacitance changes;
-- connect amplifier gain and clipping threshold to audible distortion;
-- describe how full-wave rectification can emphasize an octave;
-- describe how feedback changes the number and stability of delay repeats; and
-- compare effect order while changing only one variable at a time.
-
-## Student guide
-
-1. Start at low listening volume and select **Start audio**.
-2. Listen to the loaded grit preset, then bypass every module except the oscillator.
-3. Select the oscillator and predict what increasing `R2` will do. Change it and compare the calculated frequency with what you hear.
-4. Enable one fuzz. Compare germanium, silicon, and LED clipping models at the same resistor values.
-5. Enable octave and distortion. Reverse their order and record the difference in the **Experiment** view.
-6. Increase delay feedback gradually. Stop below self-oscillation when using speakers.
-7. Open **Build & budget**, review quantities, and explain why every product's exact package and rating must be checked before buying.
-
-## Teacher guide
-
-A 45-minute lesson can use 5 minutes for hearing the preset, 10 minutes for the oscillator RC relationship, 10 minutes for clipping comparisons, 10 minutes for signal-order exploration, and 10 minutes for reflection. Ask students to make each prediction before moving a control and to distinguish a calculated value from simulated browser sound.
-
-Useful discussion prompts:
-
-- Why does doubling a timing capacitor lower oscillator frequency?
-- Why does an octave effect respond more clearly to one note than to a chord?
-- Why can two identical fuzz modules sound different when placed on opposite sides of an octave stage?
-- Which BOM facts remain unknown until an exact physical schematic and enclosure are selected?
-
-Expected qualitative observations: higher timing resistance or capacitance lowers the oscillator pitch; stronger gain creates more clipped harmonics; a larger low-pass capacitor darkens the sound; octave before distortion is usually clearer than octave after heavy distortion; increasing delay feedback produces more repeats.
-
-## Verification checklist
-
-- Run `npm test` for repository-level static checks.
-- Check controls using keyboard-only navigation.
-- Test at desktop and tablet widths without page-level horizontal scrolling.
-- Confirm minimum, typical, maximum, and invalid enclosure dimensions.
-- Confirm audio start/stop, source switching, bypass, remove, reorder, duplicate modules, CSV download, and STL download.
-- Use headphones for microphone testing to reduce acoustic feedback.
+The Pages deployment job depends on passing tests and uploads only public application files. A deployment success is not physical validation or a listening test. Real microphone interfaces, external MIDI hardware, and physical builds need separate testing.

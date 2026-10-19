@@ -28,4 +28,4 @@ for (const type of ["oscillator", "fuzz", "overdrive", "distortion", "octave", "
 }
 
 assert.match(html, /Effect &amp; synth circuits/);
-console.log("Studio controls audit passed: eight MIDI macros, live logo scope, seven core presets, direct deletion, and ten effect circuit folders.");
+console.log("Studio controls audit passed: eight MIDI macros, live logo scope, core synth presets, direct deletion, and effect circuit folders.");
