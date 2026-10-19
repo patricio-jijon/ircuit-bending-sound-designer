@@ -427,7 +427,7 @@
       add(
         prefix + " RB",
         "pot",
-        slow ? v.lfoR : index || unit ? v.rb2 : v.rb,
+        slow ? v.lfoR * (index === 2 ? 0.73 : 1) : index || unit ? v.rb2 : v.rb,
         discharge,
         timing,
         { adjustable: true },
@@ -621,8 +621,13 @@
         16000,
       ),
       third: clamp(f * 1.042, 10, 16000),
-      clock: timerFrequency(1000, v.lfoR, v.lfoC),
-      modRate: timerFrequency(1000, v.lfoR * 0.73, v.lfoC),
+      clock: ["randompitch", "modulation"].includes(recipe.mode)
+        ? schmittFrequency(v.lfoR, v.lfoC)
+        : timerFrequency(1000, v.lfoR, v.lfoC),
+      modRate:
+        recipe.mode === "modulation"
+          ? schmittFrequency(v.lfoR, v.lfoC)
+          : timerFrequency(1000, v.lfoR * 0.73, v.lfoC),
       level: v.mix,
       mute: v.mute,
     };

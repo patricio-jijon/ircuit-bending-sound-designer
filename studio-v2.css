@@ -1929,3 +1929,11 @@ select:focus-visible,
   font-size: 10px;
   color: #aab8c9;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .dance-body,
+  .dance-arm,
+  .dance-leg {
+    transform: none !important;
+  }
+}

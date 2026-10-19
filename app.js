@@ -563,7 +563,7 @@ function sequenceNoteForStep(step) {
 function triggerSequenceStep() {
   if (!state.sequencerRunning || (!audio.sequencerVoice && !audio.externalGate)) return;
   const step=state.performance.repeat ? (state.repeatStart+state.repeatCursor)%32 : state.sequencerStep;
-  const note=state.performance.freeze?state.heldNote:sequenceNoteForStep(step);
+  const note=(state.sequenceTarget==="guitar-synth"&&state.guitarRoot==null)?null:state.performance.freeze?state.heldNote:sequenceNoteForStep(step);
   if(!state.performance.freeze)state.heldNote=note;
   const interval=sequenceIntervalMs()/1000*(step%2?1-state.swing:1+state.swing);
   gateSynthNote(state.performance.mute?null:note,state.performance.freeze?null:interval*state.gate,'sequencer');

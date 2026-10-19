@@ -148,7 +148,10 @@ Object.defineProperty(w.navigator, "mediaDevices", {
   value: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) },
 });
 const run = (s) => vm.runInContext(s, context);
-const click = (s) => w.document.querySelector(s).click();
+const click = (s) =>
+  w.document
+    .querySelector(s)
+    .dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
 for (const script of [
   ...html.matchAll(/<script src="([^"?]+)[^"]*" defer><\/script>/g),
 ])
@@ -245,6 +248,20 @@ assert(!w.document.querySelector("#combinations").hidden);
 click('[data-recipe="triple555"]');
 await Promise.resolve();
 assert.equal(run("combination.plan.chips.length"), 3);
+run(
+  'combination.id="tone555";combination.settings={};combination.view="breadboard";renderCombinations()',
+);
+const timingIndex = run(
+  'combination.plan.components.findIndex(c=>c.ref==="U1A timing C")',
+);
+click('[data-design-part="' + timingIndex + '"]');
+const replacement = w.document.querySelector('[data-design-part-setting="c"]');
+assert(replacement);
+replacement.value = "47";
+replacement.dispatchEvent(new w.Event("change", { bubbles: true }));
+await Promise.resolve();
+assert(Math.abs(run("combination.plan.settings.c") - 47e-9) < 1e-18);
+
 click('[data-design-view="schematic"]');
 assert(w.document.querySelector(".design-schematic"));
 click('[data-design-view="connections"]');

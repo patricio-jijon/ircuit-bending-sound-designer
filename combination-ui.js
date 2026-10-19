@@ -10,6 +10,31 @@ let combination = {
   redo: [],
 };
 const E = () => window.CircuitEngine;
+const designScale = (key) =>
+  ["c", "toneC"].includes(key) ? 1e-9 : key === "lfoC" ? 1e-6 : 1;
+function editableDesignComponent(c, p) {
+  if (p.id === "fuzz")
+    return { "feedback R": "rf", "input R": "rin", "tone C": "toneC" }[c.ref];
+  if (c.ref.endsWith(" RB"))
+    return c.ref.startsWith("U1") || p.id === "randompitch"
+      ? "rb"
+      : ["beat"].includes(p.sound.mode)
+        ? "rb2"
+        : "lfoR";
+  if (c.ref.endsWith(" timing C"))
+    return c.ref.startsWith("U1") || p.id === "randompitch"
+      ? "c"
+      : p.sound.mode === "beat"
+        ? "c"
+        : "lfoC";
+  if (c.ref.endsWith(" RA") && c.value !== 1000) return "ra";
+  if (c.ref === "U1 R1") return p.id === "randompitch" ? "lfoR" : "rb";
+  if (c.ref === "U1 C1") return p.id === "randompitch" ? "lfoC" : "c";
+  if (c.ref === "U2 R1") return "lfoR";
+  if (c.ref === "U2 C1") return "lfoC";
+  return null;
+}
+
 const esc = (s) =>
   String(s).replace(
     /[&<>"']/g,
@@ -106,7 +131,14 @@ function boardSvg(plan) {
       if (c.kind === "pot")
         body = `<circle cx="${x}" cy="${y}" r="11" fill="#39495b" stroke="#18212c"/><path d="M${x} ${y}v-9" stroke="#fff" stroke-width="2"/>${l.leads[c.ref][2] ? `<path d="M${x} ${y}L${point(l.leads[c.ref][2]).x} ${point(l.leads[c.ref][2]).y}" stroke="#777" stroke-width="1.5"/>` : ""}`;
       else if (c.kind === "resistor")
-        body = `<rect x="${x - 17}" y="${y - 6}" width="34" height="12" rx="4" fill="#d8bc87" stroke="#785f32"/><path d="M${x - 10} ${y - 6}v12m8-12v12m8-12v12" stroke="#825329" stroke-width="3"/>`;
+        body = `<rect x="${x - 17}" y="${y - 6}" width="34" height="12" rx="4" fill="#d8bc87" stroke="#785f32"/>${resistorBands(
+          E().value(c.value),
+        )
+          .map(
+            ([name, color], i) =>
+              `<rect x="${x - 12 + i * 5}" y="${y - 6}" width="3" height="12" fill="${color}"><title>${name}</title></rect>`,
+          )
+          .join("")}`;
       else if (c.kind === "diode")
         body = `<rect x="${x - 12}" y="${y - 5}" width="24" height="10" fill="#c57b46"/><path d="M${x + 8} ${y - 5}v10" stroke="#20252b" stroke-width="4"/>`;
       else if (c.kind === "switch")
@@ -270,16 +302,24 @@ function renderCombinations() {
    .join(
      "",
    )}</select></label><button id="design-listen">${combination.node ? "■ Stop preview" : "▶ Hear this circuit"}</button><button id="design-to-studio">Open sound in Studio</button><button id="design-undo"${combination.history.length ? "" : " disabled"}>Undo</button><button id="design-redo"${combination.redo.length ? "" : " disabled"}>Redo</button></div>
- <p class="design-lesson">${p.recipe.lesson}</p><div class="design-parameters">${[
-   ["rb", "Pitch resistance", 1000, 100000, 1000],
-   ["rb2", "Second pitch resistance", 1000, 100000, 1000],
-   ["c", "Timing capacitor", 1, 100, 1],
-   ["lfoR", "Slow clock resistance", 1000, 1000000, 1000],
-   ["lfoC", "Slow clock capacitor", 0.1, 10, 0.1],
- ]
+ <p class="design-lesson">${p.recipe.lesson}</p><div class="design-parameters">${(p.id ===
+ "fuzz"
+   ? [
+       ["rf", "Feedback resistance", 10000, 1000000, 10000],
+       ["rin", "Input resistance", 1000, 100000, 1000],
+       ["toneC", "Tone capacitor (nF)", 1, 220, 1],
+     ]
+   : [
+       ["rb", "Pitch resistance", 1000, 100000, 1000],
+       ["rb2", "Second pitch resistance", 1000, 100000, 1000],
+       ["c", "Timing capacitor", 1, 100, 0.1],
+       ["lfoR", "Slow clock resistance", 1000, 1000000, 1000],
+       ["lfoC", "Slow clock capacitor", 0.1, 10, 0.1],
+     ]
+ )
    .map(
      ([key, label, min, max, step]) =>
-       `<label>${label}<input type="range" data-design-setting="${key}" min="${min}" max="${max}" step="${step}" value="${key === "c" ? p.settings[key] * 1e9 : key === "lfoC" ? p.settings[key] * 1e6 : p.settings[key]}"><output>${E().value(p.settings[key])}</output></label>`,
+       `<label>${label}<input type="range" data-design-setting="${key}" min="${min}" max="${max}" step="${step}" value="${p.settings[key] / designScale(key)}"><output>${E().value(p.settings[key])}</output></label>`,
    )
    .join("")}</div>
  ${p.id === "highmute" || p.id === "tone4093" ? `<div class="design-switches">${p.id === "highmute" ? `<button data-design-switch="high" aria-pressed="${p.settings.high}">HIGH pitch</button>` : ""}<button data-design-switch="mute" aria-pressed="${p.settings.mute}">MUTE / gate off</button></div>` : ""}
@@ -391,11 +431,18 @@ async function previewCombination(stop = false) {
   if (s.mode === "fuzz") {
     tone.type = "sawtooth";
     const shaper = ctx.createWaveShaper();
-    shaper.curve = makeCurve(47, 0.7);
+    shaper.curve = makeCurve(
+      p.settings.rf / p.settings.rin,
+      diodeThreshold(p.settings.diode),
+    );
     gate.disconnect();
     gate.connect(shaper);
-    shaper.connect(out);
-    nodes.push(shaper);
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 1 / (2 * Math.PI * 10000 * p.settings.toneC);
+    shaper.connect(filter);
+    filter.connect(out);
+    nodes.push(shaper, filter);
   }
   combination.node = nodes;
   audio.sourceNodes.push(...nodes);
@@ -406,8 +453,29 @@ function inspectDesignPart(i) {
   const p = combination.plan,
     c = p.components[i];
   if (!c) return;
+  const key = editableDesignComponent(c, p);
+  let choices = key
+    ? ["c", "toneC"].includes(key)
+      ? [1, 2.2, 4.7, 10, 22, 47, 100, 220]
+      : key === "lfoC"
+        ? [0.1, 0.22, 0.47, 1, 2.2, 4.7, 10]
+        : [
+            1000, 2200, 4700, 10000, 22000, 47000, 100000, 220000, 470000,
+            1000000,
+          ]
+    : [];
+  choices = choices.filter((v) =>
+    key === "c"
+      ? v <= 100
+      : key === "rf"
+        ? v >= 10000
+        : ["rb", "rb2", "rin", "ra"].includes(key)
+          ? v <= 100000
+          : true,
+  );
+  const factor = c.ref === "U3A RB" && p.id === "triple555" ? 0.73 : 1;
   $("#design-part-inspector").innerHTML =
-    `<strong>${esc(c.ref)} · ${esc(E().value(c.value))}</strong><p>${c.nets.map((n, j) => `Terminal ${j + 1}: <b>${esc(n)}</b> at ${p.layout.leads[c.ref][j]}`).join(" · ")}</p><p>${c.kind === "resistor" ? "Resistance limits current or sets an RC timing relationship. Use the named pitch and clock controls above to substitute a supported value." : c.kind === "diode" ? "The banded cathode is terminal 2. Opposite diodes clip opposite signal polarities." : c.kind === "electrolytic" ? "Positive terminal 1 must face the higher DC potential. Use a voltage rating above the selected supply." : "Capacitance stores charge; increasing a timing capacitance lowers oscillator frequency."}</p>`;
+    `<strong>${esc(c.ref)} · ${esc(E().value(c.value))}</strong><p>${c.nets.map((n, j) => `Terminal ${j + 1}: <b>${esc(n)}</b> at ${p.layout.leads[c.ref][j]}`).join(" · ")}</p><p>${c.kind === "resistor" ? "Resistance limits current or sets an RC timing relationship. Use the named pitch and clock controls above to substitute a supported value." : c.kind === "diode" ? "The banded cathode is terminal 2. Opposite diodes clip opposite signal polarities." : c.kind === "electrolytic" ? "Positive terminal 1 must face the higher DC potential. Use a voltage rating above the selected supply." : "Capacitance stores charge; increasing a timing capacitance lowers oscillator frequency."}</p>${key ? `<label>Install a supported replacement <select data-design-part-setting="${key}" data-design-part-factor="${factor}"><option selected disabled>Current: ${esc(E().value(c.value))}</option>${choices.map((v) => `<option value="${v}">${E().value(v * designScale(key))}</option>`).join("")}</select></label><p>Shared controls update matching parts together. The exact-hole table and audio preview are regenerated.</p>` : "<p>This fixed part has no supported substitution in this design.</p>"}`;
 }
 function bindCombinations() {
   $("#combination-app").addEventListener("click", async (e) => {
@@ -547,11 +615,21 @@ function bindCombinations() {
       await previewCombination(true);
       return renderCombinations();
     }
+    if (e.target.dataset.designPartSetting) {
+      saveDesignHistory();
+      const key = e.target.dataset.designPartSetting;
+      combination.settings[key] =
+        (+e.target.value * designScale(key)) /
+        Number(e.target.dataset.designPartFactor || 1);
+      const playing = !!combination.node;
+      renderCombinations();
+      if (playing) await previewCombination();
+      return;
+    }
     if (e.target.id === "design-supply" || e.target.dataset.designSetting) {
       saveDesignHistory();
       const k = e.target.dataset.designSetting || "supply";
-      combination.settings[k] =
-        +e.target.value * (k === "c" ? 1e-9 : k === "lfoC" ? 1e-6 : 1);
+      combination.settings[k] = +e.target.value * designScale(k);
       const playing = !!combination.node;
       renderCombinations();
       if (playing) await previewCombination();
