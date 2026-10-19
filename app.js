@@ -1195,9 +1195,12 @@ function stopSource() {
   if ($("#sequencer-status")) updateSequencerPlayhead();
 }
 
+function sequencedOscillators(){return state.sequenceTarget==='chain'?state.modules.filter(m=>m.type==='oscillator'&&!m.bypassed):state.modules.filter(m=>String(m.id)===state.sequenceTarget&&m.type==='oscillator'&&!m.bypassed);}
+function oscillatorSignature(){return JSON.stringify(sequencedOscillators().map(m=>({id:m.id,params:m.params})));}
 function createSynthVoice() {
   if (audio.sequencerVoice) return audio.sequencerVoice;
   const ctx = audio.context;
+  const nodeStart=audio.sourceNodes.length;
   const profile = SYNTH_PROFILES[state.synthProfile];
   const voiceParams = state.voiceParams;
   const carrier = ctx.createOscillator();
@@ -1209,7 +1212,7 @@ function createSynthVoice() {
   filter.type = "lowpass";
   filter.frequency.value = voiceParams.cutoff;
   filter.Q.value = voiceParams.resonance;
-  const targets=state.sequenceTarget==='chain'?state.modules.filter(m=>m.type==='oscillator'&&!m.bypassed):state.modules.filter(m=>String(m.id)===state.sequenceTarget&&!m.bypassed);
+  const targets=sequencedOscillators();
   const voices=[];
   if(targets.length){
     targets.forEach((m,index)=>{
@@ -1257,7 +1260,7 @@ function createSynthVoice() {
   }
   envelope.connect(filter); filter.connect(audio.sourceBus); carrier.start();
   audio.sourceNodes.push(carrier, envelope, filter);
-  audio.sequencerVoice = { carrier, envelope, filter, sub, subGain, modulator, modGain, voices };
+  audio.sequencerVoice = { carrier, envelope, filter, sub, subGain, modulator, modGain, voices, signature:oscillatorSignature(),nodes:audio.sourceNodes.slice(nodeStart) };
   return audio.sequencerVoice;
 }
 
@@ -1269,6 +1272,7 @@ function gateSynthNote(note, gateSeconds = null, origin = "keyboard") {
   const time=audio.context.currentTime;
   const param=envelope.gain;
   if(param.cancelAndHoldAtTime)param.cancelAndHoldAtTime(time);else{param.cancelScheduledValues(time);param.setValueAtTime(param.value,time);}
+  if(!["voice","guitar-synth","guitar-gate"].includes(state.sequenceTarget)&&!sequencedOscillators().length)note=null;
   if(note==null || state.performance.mute){
     param.linearRampToValueAtTime(0,time+.004);
     state.lastMidiMessage=`Note off · ${origin}`;return;
@@ -1621,6 +1625,11 @@ function rebuildAudioGraph() {
     audio.moduleNodes.push(...processor.nodes);
   });
   previous.connect(audio.master);
+  if(audio.sequencerVoice && audio.sequencerVoice.signature!==oscillatorSignature()){
+    const old=audio.sequencerVoice.nodes||[];old.forEach(n=>{try{n.stop?.();n.disconnect();}catch(_){}});
+    audio.sourceNodes=audio.sourceNodes.filter(n=>!old.includes(n));audio.sequencerVoice=null;createSynthVoice();
+    gateSynthNote(state.heldNote,sequenceIntervalMs()/1000*state.gate,'chain edit');
+  }
   audio.sequencerVoice?.voices.forEach(({osc,moduleId,second})=>{const m=state.modules.find(x=>x.id===moduleId);if(!m)return;const calc=calculateModule(m);osc.frequency.setTargetAtTime(clamp((second?calc.secondFrequency:calc.frequency)*Math.pow(2,((state.heldNote??48)-48)/12),10,16000),audio.context.currentTime,.004);});
 
 }

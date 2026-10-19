@@ -217,6 +217,9 @@ assert.equal(run("audio.sequencerVoice.envelope.gain.events.at(-1)[1]"), 0);
 run(
   "stopSource();state.audioOn=false;state.performance={repeat:false,freeze:false,mute:false};",
 );
+// Removing a playing source must stop its old nodes and close an empty chain.
+run('state.source="sequencer";state.audioOn=true;rebuildAudioGraph();createSynthVoice();state.heldNote=60;gateSynthNote(60,.018,"test");');
+const removedCarrier=run('audio.sequencerVoice.carrier');run('const savedModules=state.modules;state.modules=[];rebuildAudioGraph();');assert(removedCarrier.stopped);assert.equal(run('audio.sequencerVoice.envelope.gain.events.at(-1)[1]'),0);run('state.modules=savedModules;stopSource();state.audioOn=false;');
 // Real DOM clicks and persistent snapshots catch disconnected handlers.
 click("#open-presets");
 assert(w.document.querySelector("#presets-dialog").open);
